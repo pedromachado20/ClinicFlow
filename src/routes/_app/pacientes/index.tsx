@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/start";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
-import { Plus, Phone, Mail, Pencil, Trash2, Printer, Search } from "lucide-react";
+import { useState, useRef } from "react";
+import { Plus, Phone, Mail, Pencil, Trash2, Printer, Search, Camera, X } from "lucide-react";
 import { z } from "zod";
 import { Card, CardContent } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
@@ -42,6 +42,7 @@ const salvarPaciente = createServerFn({ method: "POST" })
     tipoSanguineo: z.string().optional(),
     alergias: z.string().optional(),
     observacoes: z.string().optional(),
+    fotoUrl: z.string().optional(),
   }))
   .handler(async ({ data }) => {
     const { requireTenant } = await import("~/server/context");
@@ -74,6 +75,47 @@ export const Route = createFileRoute("/_app/pacientes/")({
   component: PacientesPage,
 });
 
+function FotoUpload({ foto, onChange }: { foto: string; onChange: (v: string) => void }) {
+  const ref = useRef<HTMLInputElement>(null);
+
+  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => onChange((ev.target?.result as string) ?? "");
+    reader.readAsDataURL(file);
+  }
+
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <div
+        className="relative h-24 w-24 rounded-full cursor-pointer overflow-hidden border-2 border-dashed border-border hover:border-primary transition-colors flex items-center justify-center bg-muted"
+        onClick={() => ref.current?.click()}
+      >
+        {foto ? (
+          <>
+            <img src={foto} alt="Foto" className="h-24 w-24 object-cover" />
+            <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+              <Camera className="h-6 w-6 text-white" />
+            </div>
+          </>
+        ) : (
+          <div className="flex flex-col items-center gap-1 text-muted-foreground">
+            <Camera className="h-6 w-6" />
+            <span className="text-xs">Foto</span>
+          </div>
+        )}
+      </div>
+      {foto && (
+        <button type="button" className="text-xs text-destructive flex items-center gap-1" onClick={() => onChange("")}>
+          <X className="h-3 w-3" /> Remover
+        </button>
+      )}
+      <input ref={ref} type="file" accept="image/jpeg,image/jpg,image/png,image/webp" className="hidden" onChange={handleFile} />
+    </div>
+  );
+}
+
 function PacientesPage() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -82,7 +124,6 @@ function PacientesPage() {
   const [busca, setBusca] = useState("");
   const [sexoSel, setSexoSel] = useState("");
 
-  // Form fields
   const [fNome, setFNome] = useState("");
   const [fCpf, setFCpf] = useState("");
   const [fRg, setFRg] = useState("");
@@ -94,6 +135,7 @@ function PacientesPage() {
   const [fTipoSang, setFTipoSang] = useState("");
   const [fAlergias, setFAlergias] = useState("");
   const [fObs, setFObs] = useState("");
+  const [fFoto, setFFoto] = useState("");
 
   const { data = [], isLoading } = useQuery({
     queryKey: ["pacientes"],
@@ -110,7 +152,7 @@ function PacientesPage() {
     setEditando(null);
     setSexoSel("");
     setFNome(""); setFCpf(""); setFRg(""); setFDataNasc(""); setFTelefone("");
-    setFEmail(""); setFConvenio(""); setFNumConvenio(""); setFTipoSang(""); setFAlergias(""); setFObs("");
+    setFEmail(""); setFConvenio(""); setFNumConvenio(""); setFTipoSang(""); setFAlergias(""); setFObs(""); setFFoto("");
     setOpen(true);
   }
 
@@ -120,6 +162,7 @@ function PacientesPage() {
     setFNome(p.nome); setFCpf(p.cpf ?? ""); setFRg(p.rg ?? ""); setFDataNasc(p.dataNascimento ?? "");
     setFTelefone(p.telefone ?? ""); setFEmail(p.email ?? ""); setFConvenio(p.convenio ?? "");
     setFNumConvenio(p.numeroConvenio ?? ""); setFTipoSang(p.tipoSanguineo ?? ""); setFAlergias(p.alergias ?? ""); setFObs(p.observacoes ?? "");
+    setFFoto(p.fotoUrl ?? "");
     setOpen(true);
   }
 
@@ -131,7 +174,7 @@ function PacientesPage() {
         telefone: fTelefone || undefined, email: fEmail || undefined,
         convenio: fConvenio || undefined, numeroConvenio: fNumConvenio || undefined,
         tipoSanguineo: fTipoSang || undefined, alergias: fAlergias || undefined,
-        observacoes: fObs || undefined,
+        observacoes: fObs || undefined, fotoUrl: fFoto || undefined,
       },
     }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["pacientes"] }); toast.success(editando ? "Paciente atualizado" : "Paciente cadastrado"); setOpen(false); },
@@ -168,6 +211,9 @@ function PacientesPage() {
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{editando ? "Editar Paciente" : "Novo Paciente"}</DialogTitle></DialogHeader>
           <form onSubmit={(e) => { e.preventDefault(); if (!fNome) { toast.error("Nome obrigatório"); return; } salvar.mutate(); }} className="space-y-3">
+            <div className="flex justify-center pb-2">
+              <FotoUpload foto={fFoto} onChange={setFFoto} />
+            </div>
             <div className="space-y-1.5">
               <Label>Nome *</Label>
               <Input value={fNome} onChange={(e) => setFNome(e.target.value)} placeholder="Nome completo" />
@@ -262,9 +308,13 @@ function PacientesPage() {
             <Card key={p.id}>
               <CardContent className="p-4 space-y-2">
                 <div className="flex items-start gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary font-bold text-sm">
-                    {p.nome.charAt(0).toUpperCase()}
-                  </div>
+                  {p.fotoUrl ? (
+                    <img src={p.fotoUrl} alt={p.nome} className="h-14 w-14 shrink-0 rounded-full object-cover" />
+                  ) : (
+                    <div className="h-14 w-14 shrink-0 rounded-full bg-primary/15 flex items-center justify-center text-primary font-bold text-lg">
+                      {p.nome.charAt(0).toUpperCase()}
+                    </div>
+                  )}
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold truncate">{p.nome}</p>
                     {p.dataNascimento && (

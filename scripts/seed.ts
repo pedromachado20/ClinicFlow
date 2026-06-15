@@ -7,13 +7,16 @@ import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import * as dotenv from "dotenv";
 import * as schema from "../src/db/schema";
+import { Argon2id } from "oslo/password";
 
 dotenv.config();
 
 const sql = neon(process.env.DATABASE_URL!);
 const db = drizzle(sql, { schema });
 
-const TENANT_ID = "seed-clinicflow-tenant-001";
+// Aceita tenant_id via variável de ambiente para popular conta real
+// Ex: SEED_TENANT_ID=xxxx npx tsx scripts/seed.ts
+const TENANT_ID = process.env.SEED_TENANT_ID ?? "seed-clinicflow-tenant-001";
 const PROF_CARLOS = "seed-prof-carlos-001";
 const PROF_ANA    = "seed-prof-ana-001";
 const PROF_PAULO  = "seed-prof-paulo-001";

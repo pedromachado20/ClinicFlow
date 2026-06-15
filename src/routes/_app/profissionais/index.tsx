@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/start";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
-import { Plus, Phone, Pencil, Trash2, Printer } from "lucide-react";
+import { useState, useRef } from "react";
+import { Plus, Phone, Pencil, Trash2, Printer, Camera, X } from "lucide-react";
 import { printTable } from "~/lib/pdf";
 import { z } from "zod";
 import { Card, CardContent } from "~/components/ui/card";
@@ -39,6 +39,7 @@ const salvarProfissional = createServerFn({ method: "POST" })
     email: z.string().optional(),
     cor: z.string().optional(),
     comissao: z.string().optional(),
+    fotoUrl: z.string().optional(),
   }))
   .handler(async ({ data }) => {
     const { requireTenant } = await import("~/server/context");
@@ -83,6 +84,47 @@ export const Route = createFileRoute("/_app/profissionais/")({
   component: ProfissionaisPage,
 });
 
+function FotoUpload({ foto, onChange }: { foto: string; onChange: (v: string) => void }) {
+  const ref = useRef<HTMLInputElement>(null);
+
+  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => onChange((ev.target?.result as string) ?? "");
+    reader.readAsDataURL(file);
+  }
+
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <div
+        className="relative h-24 w-24 rounded-full cursor-pointer overflow-hidden border-2 border-dashed border-border hover:border-primary transition-colors flex items-center justify-center bg-muted"
+        onClick={() => ref.current?.click()}
+      >
+        {foto ? (
+          <>
+            <img src={foto} alt="Foto" className="h-24 w-24 object-cover" />
+            <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+              <Camera className="h-6 w-6 text-white" />
+            </div>
+          </>
+        ) : (
+          <div className="flex flex-col items-center gap-1 text-muted-foreground">
+            <Camera className="h-6 w-6" />
+            <span className="text-xs">Foto</span>
+          </div>
+        )}
+      </div>
+      {foto && (
+        <button type="button" className="text-xs text-destructive flex items-center gap-1" onClick={() => onChange("")}>
+          <X className="h-3 w-3" /> Remover
+        </button>
+      )}
+      <input ref={ref} type="file" accept="image/jpeg,image/jpg,image/png,image/webp" className="hidden" onChange={handleFile} />
+    </div>
+  );
+}
+
 function ProfissionaisPage() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -98,6 +140,7 @@ function ProfissionaisPage() {
   const [fEmail, setFEmail] = useState("");
   const [fCor, setFCor] = useState("#0ea5e9");
   const [fComissao, setFComissao] = useState("");
+  const [fFoto, setFFoto] = useState("");
 
   const { data = [], isLoading } = useQuery({
     queryKey: ["profissionais"],
@@ -107,7 +150,7 @@ function ProfissionaisPage() {
   function abrirNovo() {
     setEditando(null);
     setEspSel(""); setConselhoSel("");
-    setFNome(""); setFRegistro(""); setFUf(""); setFTelefone(""); setFEmail(""); setFCor("#0ea5e9"); setFComissao("");
+    setFNome(""); setFRegistro(""); setFUf(""); setFTelefone(""); setFEmail(""); setFCor("#0ea5e9"); setFComissao(""); setFFoto("");
     setOpen(true);
   }
 
@@ -117,6 +160,7 @@ function ProfissionaisPage() {
     setConselhoSel(p.conselho ?? "");
     setFNome(p.nome); setFRegistro(p.registro ?? ""); setFUf(p.uf ?? "");
     setFTelefone(p.telefone ?? ""); setFEmail(p.email ?? ""); setFCor(p.cor); setFComissao(p.comissao ?? "");
+    setFFoto((p as any).fotoUrl ?? "");
     setOpen(true);
   }
 
@@ -126,6 +170,7 @@ function ProfissionaisPage() {
         id: editando?.id, nome: fNome, especialidade: espSel || "medico",
         registro: fRegistro || undefined, conselho: conselhoSel || undefined, uf: fUf || undefined,
         telefone: fTelefone || undefined, email: fEmail || undefined, cor: fCor, comissao: fComissao || undefined,
+        fotoUrl: fFoto || undefined,
       },
     }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["profissionais"] }); toast.success(editando ? "Atualizado" : "Cadastrado"); setOpen(false); },
@@ -162,6 +207,9 @@ function ProfissionaisPage() {
         <DialogContent>
           <DialogHeader><DialogTitle>{editando ? "Editar Profissional" : "Novo Profissional"}</DialogTitle></DialogHeader>
           <form onSubmit={(e) => { e.preventDefault(); if (!fNome) { toast.error("Nome obrigatório"); return; } salvar.mutate(); }} className="space-y-3">
+            <div className="flex justify-center pb-2">
+              <FotoUpload foto={fFoto} onChange={setFFoto} />
+            </div>
             <div className="space-y-1.5">
               <Label>Nome *</Label>
               <Input value={fNome} onChange={(e) => setFNome(e.target.value)} placeholder="Dr. Nome Completo" />
@@ -239,12 +287,18 @@ function ProfissionaisPage() {
           {data.map((p) => (
             <Card key={p.id}>
               <CardContent className="p-4 space-y-2">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: p.cor }} />
-                    <p className="font-semibold">{p.nome}</p>
+                <div className="flex items-start gap-3">
+                  {(p as any).fotoUrl ? (
+                    <img src={(p as any).fotoUrl} alt={p.nome} className="h-14 w-14 shrink-0 rounded-full object-cover" />
+                  ) : (
+                    <div className="h-14 w-14 shrink-0 rounded-full flex items-center justify-center text-white font-bold text-lg" style={{ backgroundColor: p.cor }}>
+                      {p.nome.charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold truncate">{p.nome}</p>
+                    <Badge variant="outline" className="text-xs mt-0.5">{especialidades.find((e) => e.value === p.especialidade)?.label ?? p.especialidade}</Badge>
                   </div>
-                  <Badge variant="outline">{especialidades.find((e) => e.value === p.especialidade)?.label ?? p.especialidade}</Badge>
                 </div>
                 {(p.conselho || p.registro) && (
                   <p className="text-xs text-muted-foreground">

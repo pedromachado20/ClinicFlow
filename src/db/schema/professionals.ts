@@ -23,6 +23,7 @@ export const professionals = pgTable("professionals", {
   email: text("email"),
   cor: text("cor").notNull().default("#0ea5e9"),
   comissao: text("comissao"),
+  fotoUrl: text("foto_url"),
   ativo: boolean("ativo").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
