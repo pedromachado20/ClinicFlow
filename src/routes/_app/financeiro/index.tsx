@@ -27,10 +27,10 @@ const getFinanceiro = createServerFn({ method: "GET" }).handler(async () => {
   const inicioMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
 
   const [receitas, despesas, receitaHoje, despesaHoje, lista] = await Promise.all([
-    db.select({ total: sql<string>`coalesce(sum(valor), 0)` }).from(transacoes).where(and(eq(transacoes.tenantId, tenantId), eq(transacoes.tipo, "receita"), gte(transacoes.data, inicioMes))),
-    db.select({ total: sql<string>`coalesce(sum(valor), 0)` }).from(transacoes).where(and(eq(transacoes.tenantId, tenantId), eq(transacoes.tipo, "despesa"), gte(transacoes.data, inicioMes))),
-    db.select({ total: sql<string>`coalesce(sum(valor), 0)` }).from(transacoes).where(and(eq(transacoes.tenantId, tenantId), eq(transacoes.tipo, "receita"), eq(transacoes.data, hoje))),
-    db.select({ total: sql<string>`coalesce(sum(valor), 0)` }).from(transacoes).where(and(eq(transacoes.tenantId, tenantId), eq(transacoes.tipo, "despesa"), eq(transacoes.data, hoje))),
+    db.select({ total: sql<string>`coalesce(sum(valor::numeric), 0)` }).from(transacoes).where(and(eq(transacoes.tenantId, tenantId), eq(transacoes.tipo, "receita"), gte(transacoes.data, inicioMes))),
+    db.select({ total: sql<string>`coalesce(sum(valor::numeric), 0)` }).from(transacoes).where(and(eq(transacoes.tenantId, tenantId), eq(transacoes.tipo, "despesa"), gte(transacoes.data, inicioMes))),
+    db.select({ total: sql<string>`coalesce(sum(valor::numeric), 0)` }).from(transacoes).where(and(eq(transacoes.tenantId, tenantId), eq(transacoes.tipo, "receita"), eq(transacoes.data, hoje))),
+    db.select({ total: sql<string>`coalesce(sum(valor::numeric), 0)` }).from(transacoes).where(and(eq(transacoes.tenantId, tenantId), eq(transacoes.tipo, "despesa"), eq(transacoes.data, hoje))),
     db.select({
       id: transacoes.id,
       tipo: transacoes.tipo,

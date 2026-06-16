@@ -30,7 +30,7 @@ const getDashboardData = createServerFn({ method: "GET" }).handler(async () => {
     .from(appointments)
     .where(and(eq(appointments.tenantId, tenantId), gte(appointments.data, inicioMes))),
 
-    db.select({ total: sql<string>`coalesce(sum(valor), 0)` })
+    db.select({ total: sql<string>`coalesce(sum(valor::numeric), 0)` })
       .from(transacoes)
       .where(and(eq(transacoes.tenantId, tenantId), eq(transacoes.tipo, "receita"), gte(transacoes.data, inicioMes))),
 
