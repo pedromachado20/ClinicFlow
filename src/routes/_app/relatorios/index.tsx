@@ -9,69 +9,73 @@ const getRelatorios = createServerFn({ method: "GET" }).handler(async () => {
   const { requireTenant } = await import("~/server/context");
   const { db } = await import("~/db");
   const { tenantId } = await requireTenant();
-  const { eq, and, gte, sql, count } = await import("drizzle-orm");
+  const { eq, and, gte, sql } = await import("drizzle-orm");
   const { appointments, patients, transacoes, services } = await import("~/db/schema");
 
   const hoje = new Date().toISOString().slice(0, 10);
   const inicioMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
 
-  // groupBy evita comparação de parâmetro text com coluna pgEnum (bug do driver Neon HTTP)
-  const [
-    totalPacientes,
-    totalConsultas,
-    receitaMes,
-    porStatusMes,
-    topServicos,
-    porTipoMes,
-    porTipoHoje,
-    receitaHoje,
-  ] = await Promise.all([
-    db.select({ count: count() }).from(patients).where(and(eq(patients.tenantId, tenantId), eq(patients.ativo, true))),
-    db.select({ count: count() }).from(appointments).where(and(eq(appointments.tenantId, tenantId), gte(appointments.data, inicioMes))),
-    db.select({ total: sql<string>`coalesce(sum(valor), 0)` }).from(transacoes).where(and(eq(transacoes.tenantId, tenantId), eq(transacoes.tipo, "receita"), gte(transacoes.data, inicioMes))),
-    db.select({ status: appointments.status, total: count() })
-      .from(appointments)
-      .where(and(eq(appointments.tenantId, tenantId), gte(appointments.data, inicioMes)))
-      .groupBy(appointments.status),
-    db.select({ nome: services.nome, total: count() })
+  // Usa sql`` com literais inline para colunas pgEnum — evita bug de cast text→enum no Neon HTTP
+  const [pacTotal, mesStat, receitaMes, topServicos, hojeStat, receitaHoje] = await Promise.all([
+    db.select({ n: sql<string>`count(*)` })
+      .from(patients)
+      .where(and(eq(patients.tenantId, tenantId), sql`${patients.ativo} = true`)),
+
+    db.select({
+      total:      sql<string>`count(*)`,
+      concluidas: sql<string>`count(*) filter (where status = 'concluido')`,
+      particular: sql<string>`count(*) filter (where tipo_atendimento = 'particular')`,
+      convenio:   sql<string>`count(*) filter (where tipo_atendimento = 'convenio')`,
+    })
+    .from(appointments)
+    .where(and(eq(appointments.tenantId, tenantId), gte(appointments.data, inicioMes))),
+
+    db.select({ total: sql<string>`coalesce(sum(valor), 0)` })
+      .from(transacoes)
+      .where(and(eq(transacoes.tenantId, tenantId), eq(transacoes.tipo, "receita"), gte(transacoes.data, inicioMes))),
+
+    db.select({ nome: services.nome, total: sql<string>`count(*)` })
       .from(appointments)
       .leftJoin(services, eq(appointments.serviceId, services.id))
       .where(and(eq(appointments.tenantId, tenantId), gte(appointments.data, inicioMes)))
       .groupBy(services.nome)
       .orderBy(sql`count(*) desc`)
       .limit(5),
-    db.select({ tipo: appointments.tipoAtendimento, total: count() })
-      .from(appointments)
-      .where(and(eq(appointments.tenantId, tenantId), gte(appointments.data, inicioMes)))
-      .groupBy(appointments.tipoAtendimento),
-    db.select({ tipo: appointments.tipoAtendimento, total: count() })
-      .from(appointments)
-      .where(and(eq(appointments.tenantId, tenantId), eq(appointments.data, hoje)))
-      .groupBy(appointments.tipoAtendimento),
-    db.select({ total: sql<string>`coalesce(sum(valor), 0)` }).from(transacoes).where(and(eq(transacoes.tenantId, tenantId), eq(transacoes.tipo, "receita"), eq(transacoes.data, hoje))),
+
+    db.select({
+      total:      sql<string>`count(*)`,
+      particular: sql<string>`count(*) filter (where tipo_atendimento = 'particular')`,
+      convenio:   sql<string>`count(*) filter (where tipo_atendimento = 'convenio')`,
+    })
+    .from(appointments)
+    .where(and(eq(appointments.tenantId, tenantId), eq(appointments.data, hoje))),
+
+    db.select({ total: sql<string>`coalesce(sum(valor), 0)` })
+      .from(transacoes)
+      .where(and(eq(transacoes.tenantId, tenantId), eq(transacoes.tipo, "receita"), eq(transacoes.data, hoje))),
   ]);
 
-  const totalConsultasMes = totalConsultas[0]?.count ?? 0;
-  const concluidas = porStatusMes.find((s) => s.status === "concluido")?.total ?? 0;
-  const taxaComparecimento = totalConsultasMes > 0
-    ? Math.round((concluidas / totalConsultasMes) * 100)
-    : 0;
-
-  const consultasHoje = porTipoHoje.reduce((acc, t) => acc + t.total, 0);
-  const particularHoje = porTipoHoje.find((t) => t.tipo === "particular")?.total ?? 0;
-  const convenioHoje = porTipoHoje.find((t) => t.tipo === "convenio")?.total ?? 0;
-  const particularMes = porTipoMes.find((t) => t.tipo === "particular")?.total ?? 0;
-  const convenioMes = porTipoMes.find((t) => t.tipo === "convenio")?.total ?? 0;
+  const int = (v?: string | null) => parseInt(v ?? "0", 10);
+  const totalConsultasMes = int(mesStat[0]?.total);
+  const concluidas = int(mesStat[0]?.concluidas);
+  const particularMes = int(mesStat[0]?.particular);
+  const convenioMes = int(mesStat[0]?.convenio);
+  const consultasHoje = int(hojeStat[0]?.total);
+  const particularHoje = int(hojeStat[0]?.particular);
+  const convenioHoje = int(hojeStat[0]?.convenio);
 
   return {
-    totalPacientes: totalPacientes[0]?.count ?? 0,
-    totalConsultas: totalConsultasMes,
-    receitaMes: parseFloat(receitaMes[0]?.total ?? "0"),
-    taxaComparecimento,
-    topServicos,
-    tipoAtendimento: porTipoMes,
+    totalPacientes:    int(pacTotal[0]?.n),
+    totalConsultas:    totalConsultasMes,
+    receitaMes:        parseFloat(receitaMes[0]?.total ?? "0"),
+    taxaComparecimento: totalConsultasMes > 0 ? Math.round((concluidas / totalConsultasMes) * 100) : 0,
+    topServicos:       topServicos.map((s) => ({ ...s, total: int(s.total) })),
+    tipoAtendimento: [
+      { tipo: "particular" as const, total: particularMes },
+      { tipo: "convenio"  as const, total: convenioMes },
+    ],
     consultasHoje,
-    receitaHoje: parseFloat(receitaHoje[0]?.total ?? "0"),
+    receitaHoje:    parseFloat(receitaHoje[0]?.total ?? "0"),
     particularHoje,
     convenioHoje,
     particularMes,

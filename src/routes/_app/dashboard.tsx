@@ -9,38 +9,48 @@ const getDashboardData = createServerFn({ method: "GET" }).handler(async () => {
   const { requireTenant } = await import("~/server/context");
   const { db } = await import("~/db");
   const { tenantId } = await requireTenant();
-  const { eq, and, gte, sql, count, asc } = await import("drizzle-orm");
+  const { eq, and, gte, sql, asc } = await import("drizzle-orm");
   const { appointments, patients, transacoes, professionals, services } = await import("~/db/schema");
 
   const hoje = new Date().toISOString().slice(0, 10);
   const inicioMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
 
-  // groupBy evita comparação de parâmetro text com coluna pgEnum (bug do driver Neon HTTP)
-  const [totalPacientes, porStatusMes, receitaMes, porTipoHoje, porTipoMes, proximasConsultas] = await Promise.all([
-    db.select({ count: count() }).from(patients).where(and(eq(patients.tenantId, tenantId), eq(patients.ativo, true))),
-    db.select({ status: appointments.status, total: count() })
-      .from(appointments)
-      .where(and(eq(appointments.tenantId, tenantId), gte(appointments.data, inicioMes)))
-      .groupBy(appointments.status),
-    db.select({ total: sql<string>`coalesce(sum(valor), 0)` }).from(transacoes)
-      .where(and(eq(transacoes.tenantId, tenantId), eq(transacoes.tipo, "receita"), gte(transacoes.data, inicioMes))),
-    db.select({ tipo: appointments.tipoAtendimento, total: count() })
-      .from(appointments)
-      .where(and(eq(appointments.tenantId, tenantId), eq(appointments.data, hoje)))
-      .groupBy(appointments.tipoAtendimento),
-    db.select({ tipo: appointments.tipoAtendimento, total: count() })
-      .from(appointments)
-      .where(and(eq(appointments.tenantId, tenantId), gte(appointments.data, inicioMes)))
-      .groupBy(appointments.tipoAtendimento),
+  // Usa sql`` com literais inline para colunas pgEnum — evita bug de cast text→enum no Neon HTTP
+  const [pacTotal, mesStat, receitaMes, hojeStat, proximas] = await Promise.all([
+    db.select({ n: sql<string>`count(*)` })
+      .from(patients)
+      .where(and(eq(patients.tenantId, tenantId), sql`${patients.ativo} = true`)),
+
     db.select({
-      id: appointments.id,
-      data: appointments.data,
-      horaInicio: appointments.horaInicio,
-      status: appointments.status,
-      tipoAtendimento: appointments.tipoAtendimento,
-      pacienteNome: patients.nome,
+      total:      sql<string>`count(*)`,
+      concluidas: sql<string>`count(*) filter (where status = 'concluido')`,
+      particular: sql<string>`count(*) filter (where tipo_atendimento = 'particular')`,
+      convenio:   sql<string>`count(*) filter (where tipo_atendimento = 'convenio')`,
+    })
+    .from(appointments)
+    .where(and(eq(appointments.tenantId, tenantId), gte(appointments.data, inicioMes))),
+
+    db.select({ total: sql<string>`coalesce(sum(valor), 0)` })
+      .from(transacoes)
+      .where(and(eq(transacoes.tenantId, tenantId), eq(transacoes.tipo, "receita"), gte(transacoes.data, inicioMes))),
+
+    db.select({
+      total:      sql<string>`count(*)`,
+      particular: sql<string>`count(*) filter (where tipo_atendimento = 'particular')`,
+      convenio:   sql<string>`count(*) filter (where tipo_atendimento = 'convenio')`,
+    })
+    .from(appointments)
+    .where(and(eq(appointments.tenantId, tenantId), eq(appointments.data, hoje))),
+
+    db.select({
+      id:              appointments.id,
+      data:            appointments.data,
+      horaInicio:      appointments.horaInicio,
+      status:          sql<string>`${appointments.status}::text`,
+      tipoAtendimento: sql<string>`${appointments.tipoAtendimento}::text`,
+      pacienteNome:    patients.nome,
       profissionalNome: professionals.nome,
-      serviceNome: services.nome,
+      serviceNome:     services.nome,
     })
     .from(appointments)
     .leftJoin(patients, eq(appointments.pacienteId, patients.id))
@@ -51,29 +61,21 @@ const getDashboardData = createServerFn({ method: "GET" }).handler(async () => {
     .limit(6),
   ]);
 
-  const totalConsultasMes = porStatusMes.reduce((acc, s) => acc + s.total, 0);
-  const concluidas = porStatusMes.find((s) => s.status === "concluido")?.total ?? 0;
-  const taxaComparecimento = totalConsultasMes > 0
-    ? Math.round((concluidas / totalConsultasMes) * 100)
-    : 0;
-
-  const consultasHoje = porTipoHoje.reduce((acc, t) => acc + t.total, 0);
-  const particularHoje = porTipoHoje.find((t) => t.tipo === "particular")?.total ?? 0;
-  const convenioHoje = porTipoHoje.find((t) => t.tipo === "convenio")?.total ?? 0;
-  const particularMes = porTipoMes.find((t) => t.tipo === "particular")?.total ?? 0;
-  const convenioMes = porTipoMes.find((t) => t.tipo === "convenio")?.total ?? 0;
+  const int = (v?: string | null) => parseInt(v ?? "0", 10);
+  const totalConsultasMes = int(mesStat[0]?.total);
+  const concluidas = int(mesStat[0]?.concluidas);
 
   return {
-    totalPacientes: totalPacientes[0]?.count ?? 0,
-    consultasHoje,
+    totalPacientes:   int(pacTotal[0]?.n),
+    consultasHoje:    int(hojeStat[0]?.total),
     totalConsultasMes,
-    receitaMes: parseFloat(receitaMes[0]?.total ?? "0"),
-    taxaComparecimento,
-    particularHoje,
-    convenioHoje,
-    particularMes,
-    convenioMes,
-    proximasConsultas,
+    receitaMes:       parseFloat(receitaMes[0]?.total ?? "0"),
+    taxaComparecimento: totalConsultasMes > 0 ? Math.round((concluidas / totalConsultasMes) * 100) : 0,
+    particularHoje:   int(hojeStat[0]?.particular),
+    convenioHoje:     int(hojeStat[0]?.convenio),
+    particularMes:    int(mesStat[0]?.particular),
+    convenioMes:      int(mesStat[0]?.convenio),
+    proximasConsultas: proximas,
   };
 });
 
