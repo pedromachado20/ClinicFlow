@@ -167,18 +167,35 @@ function AgendaPage() {
         tipoAtendimento: tipoAtSel, convenio: convenioVal || undefined, observacoes: obsVal || undefined,
       },
     }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["agenda"] }); toast.success(editando ? "Atualizado" : "Agendado"); setOpen(false); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["agenda"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      qc.invalidateQueries({ queryKey: ["relatorios"] });
+      toast.success(editando ? "Atualizado" : "Agendado");
+      setOpen(false);
+    },
     onError: () => toast.error("Erro ao salvar"),
   });
 
   const mudarStatus = useMutation({
     mutationFn: (v: { id: string; status: string }) => alterarStatus({ data: v }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["agenda"] }); toast.success("Status atualizado"); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["agenda"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      qc.invalidateQueries({ queryKey: ["relatorios"] });
+      toast.success("Status atualizado");
+    },
   });
 
   const excluir = useMutation({
     mutationFn: (id: string) => excluirAgendamento({ data: { id } }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["agenda"] }); toast.success("Excluído"); setExcluindo(null); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["agenda"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      qc.invalidateQueries({ queryKey: ["relatorios"] });
+      toast.success("Excluído");
+      setExcluindo(null);
+    },
     onError: () => toast.error("Erro ao excluir"),
   });
 

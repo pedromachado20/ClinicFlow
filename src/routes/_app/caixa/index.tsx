@@ -130,6 +130,9 @@ function CaixaPage() {
     onSuccess: async () => {
       const fresh = await getCaixa({ data: { data: dataAtual } });
       qc.setQueryData(["caixa", dataAtual], fresh);
+      qc.invalidateQueries({ queryKey: ["financeiro"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      qc.invalidateQueries({ queryKey: ["relatorios"] });
       const pacienteId = selecionado?.paciente.id;
       if (pacienteId) {
         const updated = fresh.grupos.find((g) => g.paciente.id === pacienteId);

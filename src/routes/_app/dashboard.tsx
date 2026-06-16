@@ -65,6 +65,7 @@ function DashboardPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["dashboard"],
     queryFn: () => getDashboardData(),
+    refetchOnMount: "always",
   });
 
   const kpis = [

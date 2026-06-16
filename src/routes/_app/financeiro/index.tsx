@@ -85,7 +85,14 @@ function FinanceiroPage() {
 
   const criar = useMutation({
     mutationFn: (values: z.infer<typeof schema>) => criarTransacao({ data: values }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["financeiro"] }); toast.success("Lançamento salvo"); setOpen(false); reset(); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["financeiro"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      qc.invalidateQueries({ queryKey: ["relatorios"] });
+      toast.success("Lançamento salvo");
+      setOpen(false);
+      reset();
+    },
     onError: () => toast.error("Erro ao salvar"),
   });
 

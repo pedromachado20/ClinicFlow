@@ -61,6 +61,7 @@ function RelatoriosPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["relatorios"],
     queryFn: () => getRelatorios(),
+    refetchOnMount: "always",
   });
 
   const kpis = [

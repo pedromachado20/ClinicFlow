@@ -7,6 +7,7 @@ import { z } from "zod";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
+import { Textarea } from "~/components/ui/textarea";
 import { Label } from "~/components/ui/label";
 import { Badge } from "~/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "~/components/ui/dialog";
@@ -452,7 +453,7 @@ function ProntuariosPage() {
                                 dataFim: a.dataFim,
                                 cid: a.cid ?? undefined,
                                 motivo: a.motivo ?? undefined,
-                                data: a.dataInicio,
+                                data: a.createdAt.toString().slice(0, 10),
                               });
                             }
                           }}>
@@ -489,15 +490,15 @@ function ProntuariosPage() {
             </div>
             <div className="space-y-1.5">
               <Label>Queixa Principal</Label>
-              <Input value={proQueixa} onChange={(e) => setProQueixa(e.target.value)} placeholder="Motivo da consulta" />
+              <Textarea value={proQueixa} onChange={(e) => setProQueixa(e.target.value)} placeholder="Motivo da consulta" rows={2} />
             </div>
             <div className="space-y-1.5">
               <Label>Histórico Clínico</Label>
-              <Input value={proHist} onChange={(e) => setProHist(e.target.value)} placeholder="Histórico relevante" />
+              <Textarea value={proHist} onChange={(e) => setProHist(e.target.value)} placeholder="Histórico relevante" rows={2} />
             </div>
             <div className="space-y-1.5">
               <Label>Exame Clínico</Label>
-              <Input value={proExame} onChange={(e) => setProExame(e.target.value)} placeholder="Achados do exame físico" />
+              <Textarea value={proExame} onChange={(e) => setProExame(e.target.value)} placeholder="Achados do exame físico" rows={2} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
@@ -511,7 +512,7 @@ function ProntuariosPage() {
             </div>
             <div className="space-y-1.5">
               <Label>Conduta</Label>
-              <Input value={proConduta} onChange={(e) => setProConduta(e.target.value)} placeholder="Tratamento prescrito" />
+              <Textarea value={proConduta} onChange={(e) => setProConduta(e.target.value)} placeholder="Tratamento prescrito" rows={2} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
@@ -630,7 +631,7 @@ function ProntuariosPage() {
 
             <div className="space-y-1.5">
               <Label>Observações</Label>
-              <Input value={recObs} onChange={(e) => setRecObs(e.target.value)} placeholder="Observações gerais" />
+              <Textarea value={recObs} onChange={(e) => setRecObs(e.target.value)} placeholder="Observações gerais" rows={2} />
             </div>
 
             <div className="flex gap-2">
