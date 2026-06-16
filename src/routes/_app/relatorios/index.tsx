@@ -1,22 +1,24 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/start";
 import { useQuery } from "@tanstack/react-query";
-import { BarChart3, TrendingUp, Users, CalendarDays, Sun, Activity, Stethoscope } from "lucide-react";
+import { BarChart3, TrendingUp, Users, CalendarDays, Sun, Activity, Stethoscope, Printer } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { Button } from "~/components/ui/button";
 import { formatCurrency } from "~/lib/utils";
+import { printRelatorio } from "~/lib/pdf";
 
 const getRelatorios = createServerFn({ method: "GET" }).handler(async () => {
   const { requireTenant } = await import("~/server/context");
   const { db } = await import("~/db");
   const { tenantId } = await requireTenant();
   const { eq, and, gte, sql } = await import("drizzle-orm");
-  const { appointments, patients, transacoes, services } = await import("~/db/schema");
+  const { appointments, patients, transacoes, services, tenants } = await import("~/db/schema");
 
   const hoje = new Date().toISOString().slice(0, 10);
   const inicioMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
 
   // Usa sql`` com literais inline para colunas pgEnum — evita bug de cast text→enum no Neon HTTP
-  const [pacTotal, mesStat, receitaMes, topServicos, hojeStat, receitaHoje] = await Promise.all([
+  const [pacTotal, mesStat, receitaMes, topServicos, hojeStat, receitaHoje, tenant] = await Promise.all([
     db.select({ n: sql<string>`count(*)` })
       .from(patients)
       .where(and(eq(patients.tenantId, tenantId), sql`${patients.ativo} = true`)),
@@ -53,6 +55,8 @@ const getRelatorios = createServerFn({ method: "GET" }).handler(async () => {
     db.select({ total: sql<string>`coalesce(sum(valor::numeric), 0)` })
       .from(transacoes)
       .where(and(eq(transacoes.tenantId, tenantId), eq(transacoes.tipo, "receita"), eq(transacoes.data, hoje))),
+
+    db.query.tenants.findFirst({ where: eq(tenants.id, tenantId), columns: { nome: true } }),
   ]);
 
   const int = (v?: string | null) => parseInt(v ?? "0", 10);
@@ -65,6 +69,7 @@ const getRelatorios = createServerFn({ method: "GET" }).handler(async () => {
   const convenioHoje = int(hojeStat[0]?.convenio);
 
   return {
+    nomeClinica:       tenant?.nome ?? "Clínica",
     totalPacientes:    int(pacTotal[0]?.n),
     totalConsultas:    totalConsultasMes,
     receitaMes:        parseFloat(receitaMes[0]?.total ?? "0"),
@@ -102,6 +107,24 @@ function RelatoriosPage() {
 
   return (
     <div className="space-y-6">
+      <div className="flex justify-end">
+        <Button variant="outline" size="sm" disabled={isLoading || !data} onClick={() => data && printRelatorio({
+          nomeClinica: data.nomeClinica,
+          consultasHoje: data.consultasHoje,
+          receitaHoje: data.receitaHoje,
+          particularHoje: data.particularHoje,
+          convenioHoje: data.convenioHoje,
+          totalPacientes: data.totalPacientes,
+          totalConsultas: data.totalConsultas,
+          receitaMes: data.receitaMes,
+          taxaComparecimento: data.taxaComparecimento,
+          particularMes: data.particularMes,
+          convenioMes: data.convenioMes,
+          topServicos: data.topServicos,
+        })}>
+          <Printer className="h-4 w-4" /> PDF
+        </Button>
+      </div>
       {/* KPIs do Dia */}
       <div>
         <p className="text-xs text-muted-foreground mb-3 font-medium uppercase tracking-wide">Hoje</p>

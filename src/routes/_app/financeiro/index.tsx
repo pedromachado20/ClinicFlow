@@ -3,7 +3,7 @@ import { createServerFn } from "@tanstack/start";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Plus, TrendingUp, TrendingDown, DollarSign, Printer, Sun } from "lucide-react";
-import { printTable } from "~/lib/pdf";
+import { printFinanceiroAgrupado } from "~/lib/pdf";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -21,12 +21,12 @@ const getFinanceiro = createServerFn({ method: "GET" }).handler(async () => {
   const { db } = await import("~/db");
   const { tenantId } = await requireTenant();
   const { eq, and, gte, sql, desc } = await import("drizzle-orm");
-  const { transacoes } = await import("~/db/schema");
+  const { transacoes, tenants } = await import("~/db/schema");
 
   const hoje = new Date().toISOString().slice(0, 10);
   const inicioMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
 
-  const [receitas, despesas, receitaHoje, despesaHoje, lista] = await Promise.all([
+  const [receitas, despesas, receitaHoje, despesaHoje, lista, tenant] = await Promise.all([
     db.select({ total: sql<string>`coalesce(sum(valor::numeric), 0)` }).from(transacoes).where(and(eq(transacoes.tenantId, tenantId), eq(transacoes.tipo, "receita"), gte(transacoes.data, inicioMes))),
     db.select({ total: sql<string>`coalesce(sum(valor::numeric), 0)` }).from(transacoes).where(and(eq(transacoes.tenantId, tenantId), eq(transacoes.tipo, "despesa"), gte(transacoes.data, inicioMes))),
     db.select({ total: sql<string>`coalesce(sum(valor::numeric), 0)` }).from(transacoes).where(and(eq(transacoes.tenantId, tenantId), eq(transacoes.tipo, "receita"), eq(transacoes.data, hoje))),
@@ -44,11 +44,14 @@ const getFinanceiro = createServerFn({ method: "GET" }).handler(async () => {
     .where(and(eq(transacoes.tenantId, tenantId), gte(transacoes.data, inicioMes)))
     .orderBy(desc(transacoes.data), desc(transacoes.createdAt))
     .limit(50),
+
+    db.query.tenants.findFirst({ where: eq(tenants.id, tenantId), columns: { nome: true } }),
   ]);
 
   const totalReceitas = parseFloat(receitas[0]?.total ?? "0");
   const totalDespesas = parseFloat(despesas[0]?.total ?? "0");
   return {
+    nomeClinica: tenant?.nome ?? "Clínica",
     totalReceitas,
     totalDespesas,
     saldo: totalReceitas - totalDespesas,
@@ -176,13 +179,14 @@ function FinanceiroPage() {
         <h3 className="font-semibold">Lançamentos do Mês</h3>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" disabled={!data?.transacoes?.length} onClick={() =>
-            printTable("Financeiro — Lançamentos do Mês", ["Data", "Tipo", "Categoria", "Descrição", "Valor"],
-              (data?.transacoes ?? []).map((t) => [
-                new Date(t.data + "T00:00:00").toLocaleDateString("pt-BR"),
-                t.tipo, t.categoria, t.descricao,
-                (t.tipo === "receita" ? "+ " : "- ") + parseFloat(t.valor).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }),
-              ])
-            )
+            data && printFinanceiroAgrupado({
+              nomeClinica: data.nomeClinica,
+              mes: new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" }),
+              transacoes: data.transacoes,
+              totalReceitas: data.totalReceitas,
+              totalDespesas: data.totalDespesas,
+              saldo: data.saldo,
+            })
           }>
             <Printer className="h-4 w-4" /> PDF
           </Button>

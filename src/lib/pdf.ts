@@ -20,6 +20,177 @@ const BASE_CSS = `
   @media print { body { padding: 12px; } }
 `;
 
+export function printRelatorio(opts: {
+  nomeClinica: string;
+  consultasHoje: number;
+  receitaHoje: number;
+  particularHoje: number;
+  convenioHoje: number;
+  totalPacientes: number;
+  totalConsultas: number;
+  receitaMes: number;
+  taxaComparecimento: number;
+  particularMes: number;
+  convenioMes: number;
+  topServicos: { nome: string | null; total: number }[];
+}) {
+  const fmtR = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  const mes = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  const hoje = new Date().toLocaleDateString("pt-BR");
+  const totalTipo = opts.particularMes + opts.convenioMes || 1;
+  const pctPart = Math.round((opts.particularMes / totalTipo) * 100);
+  const pctConv = Math.round((opts.convenioMes / totalTipo) * 100);
+
+  const topRows = opts.topServicos.map((s, i) =>
+    `<tr><td>#${i + 1}</td><td>${s.nome ?? "Serviço removido"}</td><td style="text-align:right">${s.total} vez${s.total !== 1 ? "es" : ""}</td></tr>`
+  ).join("");
+
+  openPrint(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Relatórios</title>
+    <style>
+      ${BASE_CSS}
+      body { max-width: 800px; margin: 0 auto; padding: 28px; }
+      .header { border-bottom: 2px solid #111; padding-bottom: 12px; margin-bottom: 20px; }
+      .header h1 { font-size: 20px; margin: 0 0 2px; }
+      .section-title { font-size: 9px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; color: #888; margin: 20px 0 8px; border-top: 1px solid #eee; padding-top: 10px; }
+      .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 4px; }
+      .kpi-grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 4px; }
+      .kpi { border: 1px solid #e5e5e5; border-radius: 6px; padding: 10px 12px; }
+      .kpi .label { font-size: 9px; color: #777; margin-bottom: 4px; }
+      .kpi .value { font-size: 16px; font-weight: bold; }
+      .kpi .sub { font-size: 9px; color: #555; margin-top: 2px; }
+      .green { color: #16a34a; }
+      .bar-row { display: flex; align-items: center; gap: 8px; margin: 4px 0; font-size: 10px; }
+      .bar-bg { flex: 1; height: 8px; background: #eee; border-radius: 4px; overflow: hidden; }
+      .bar-fill { height: 100%; border-radius: 4px; background: #2563eb; }
+      .bar-fill-green { height: 100%; border-radius: 4px; background: #16a34a; }
+      .bar-label { width: 80px; text-align: right; color: #555; }
+      @media print { body { padding: 15px; } }
+    </style></head><body>
+    <div class="header">
+      <h1>Relatório Gerencial</h1>
+      <div class="sub">${opts.nomeClinica} · Gerado em ${new Date().toLocaleString("pt-BR")}</div>
+    </div>
+
+    <div class="section-title">Hoje — ${hoje}</div>
+    <div class="kpi-grid">
+      <div class="kpi"><div class="label">Consultas Hoje</div><div class="value">${opts.consultasHoje}</div><div class="sub">${opts.particularHoje} part. · ${opts.convenioHoje} conv.</div></div>
+      <div class="kpi"><div class="label">Receita Hoje</div><div class="value green">${fmtR(opts.receitaHoje)}</div></div>
+      <div class="kpi"><div class="label">Particular Hoje</div><div class="value">${opts.particularHoje}</div><div class="sub">atendimentos</div></div>
+      <div class="kpi"><div class="label">Convênio Hoje</div><div class="value">${opts.convenioHoje}</div><div class="sub">atendimentos</div></div>
+    </div>
+
+    <div class="section-title">Mês de ${mes}</div>
+    <div class="kpi-grid">
+      <div class="kpi"><div class="label">Pacientes Ativos</div><div class="value">${opts.totalPacientes}</div></div>
+      <div class="kpi"><div class="label">Consultas no Mês</div><div class="value">${opts.totalConsultas}</div><div class="sub">${opts.particularMes} part. · ${opts.convenioMes} conv.</div></div>
+      <div class="kpi"><div class="label">Receita do Mês</div><div class="value green">${fmtR(opts.receitaMes)}</div></div>
+      <div class="kpi"><div class="label">Taxa de Comparecimento</div><div class="value">${opts.taxaComparecimento}%</div></div>
+    </div>
+
+    <div class="section-title">Particular vs Convênio — Mês</div>
+    <div style="padding: 4px 0;">
+      <div class="bar-row">
+        <span style="width:70px">Particular</span>
+        <div class="bar-bg"><div class="bar-fill" style="width:${pctPart}%"></div></div>
+        <span class="bar-label">${opts.particularMes} atend. (${pctPart}%)</span>
+      </div>
+      <div class="bar-row">
+        <span style="width:70px">Convênio</span>
+        <div class="bar-bg"><div class="bar-fill-green" style="width:${pctConv}%"></div></div>
+        <span class="bar-label">${opts.convenioMes} atend. (${pctConv}%)</span>
+      </div>
+    </div>
+
+    ${opts.topServicos.length > 0 ? `
+    <div class="section-title">Top Serviços do Mês</div>
+    <table><thead><tr><th>#</th><th>Serviço</th><th style="text-align:right">Qtd</th></tr></thead>
+    <tbody>${topRows}</tbody></table>` : ""}
+
+    <div class="section-title">Faturamento do Mês</div>
+    <div class="kpi-grid-2">
+      <div class="kpi"><div class="label">Receita Registrada (Particular)</div><div class="value green" style="font-size:20px">${fmtR(opts.receitaMes)}</div></div>
+      <div class="kpi"><div class="label">Taxa de Comparecimento</div><div class="value" style="font-size:20px">${opts.taxaComparecimento}%</div><div class="sub">de ${opts.totalConsultas} consultas agendadas</div></div>
+    </div>
+  </body></html>`);
+}
+
+export function printFinanceiroAgrupado(opts: {
+  nomeClinica: string;
+  mes: string;
+  transacoes: { tipo: string; categoria: string; descricao: string; valor: string; data: string }[];
+  totalReceitas: number;
+  totalDespesas: number;
+  saldo: number;
+}) {
+  const fmtR = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+  // Agrupar por data
+  const porDia = new Map<string, typeof opts.transacoes>();
+  for (const t of opts.transacoes) {
+    if (!porDia.has(t.data)) porDia.set(t.data, []);
+    porDia.get(t.data)!.push(t);
+  }
+  const diasOrdenados = [...porDia.keys()].sort((a, b) => b.localeCompare(a));
+
+  const diasHtml = diasOrdenados.map((dia) => {
+    const items = porDia.get(dia)!;
+    const receitas = items.filter((t) => t.tipo === "receita");
+    const despesas = items.filter((t) => t.tipo === "despesa");
+    const totalDia = items.reduce((s, t) => {
+      const v = parseFloat(t.valor);
+      return t.tipo === "receita" ? s + v : s - v;
+    }, 0);
+
+    const linhaReceitas = receitas.map((t) =>
+      `<tr><td style="padding-left:16px;color:#16a34a">↑ Receita</td><td>${t.categoria}</td><td>${t.descricao}</td><td style="text-align:right;color:#16a34a;font-weight:500">+ ${fmtR(parseFloat(t.valor))}</td></tr>`
+    ).join("");
+
+    const linhaDespesas = despesas.map((t) =>
+      `<tr><td style="padding-left:16px;color:#dc2626">↓ Despesa</td><td>${t.categoria}</td><td>${t.descricao}</td><td style="text-align:right;color:#dc2626;font-weight:500">- ${fmtR(parseFloat(t.valor))}</td></tr>`
+    ).join("");
+
+    const saldoDia = totalDia >= 0
+      ? `<span style="color:#16a34a">+ ${fmtR(totalDia)}</span>`
+      : `<span style="color:#dc2626">- ${fmtR(Math.abs(totalDia))}</span>`;
+
+    return `
+      <tr style="background:#f4f4f4">
+        <td colspan="3" style="font-weight:bold;font-size:11px;padding:7px 8px">
+          ${new Date(dia + "T00:00:00").toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" })}
+        </td>
+        <td style="text-align:right;padding:7px 8px;font-weight:bold">${saldoDia}</td>
+      </tr>
+      ${linhaReceitas}${linhaDespesas}`;
+  }).join("");
+
+  openPrint(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Financeiro</title>
+    <style>
+      ${BASE_CSS}
+      body { max-width: 800px; margin: 0 auto; padding: 28px; }
+      .header { border-bottom: 2px solid #111; padding-bottom: 12px; margin-bottom: 16px; }
+      .header h1 { font-size: 20px; margin: 0 0 2px; }
+      .resumo { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
+      .resumo-card { border: 1px solid #e5e5e5; border-radius: 6px; padding: 10px 12px; }
+      .resumo-card .label { font-size: 9px; color: #777; margin-bottom: 3px; text-transform: uppercase; letter-spacing: .5px; }
+      .resumo-card .value { font-size: 17px; font-weight: bold; }
+      @media print { body { padding: 15px; } }
+    </style></head><body>
+    <div class="header">
+      <h1>Financeiro — Lançamentos do Mês</h1>
+      <div class="sub">${opts.nomeClinica} · ${opts.mes} · Gerado em ${new Date().toLocaleString("pt-BR")}</div>
+    </div>
+    <div class="resumo">
+      <div class="resumo-card"><div class="label">Receitas do Mês</div><div class="value" style="color:#16a34a">${fmtR(opts.totalReceitas)}</div></div>
+      <div class="resumo-card"><div class="label">Despesas do Mês</div><div class="value" style="color:#dc2626">${fmtR(opts.totalDespesas)}</div></div>
+      <div class="resumo-card"><div class="label">Saldo do Mês</div><div class="value" style="color:${opts.saldo >= 0 ? "#16a34a" : "#dc2626"}">${opts.saldo >= 0 ? "" : "- "}${fmtR(Math.abs(opts.saldo))}</div></div>
+    </div>
+    <table>
+      <thead><tr><th>Tipo</th><th>Categoria</th><th>Descrição</th><th style="text-align:right">Valor</th></tr></thead>
+      <tbody>${diasHtml}</tbody>
+    </table>
+  </body></html>`);
+}
+
 export function printTable(title: string, headers: string[], rows: (string | number)[][], info = "") {
   const bodyRows = rows.map((r) => `<tr>${r.map((c) => `<td>${c ?? "-"}</td>`).join("")}</tr>`).join("");
   openPrint(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title>
