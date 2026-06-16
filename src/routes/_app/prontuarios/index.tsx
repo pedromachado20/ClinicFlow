@@ -1,8 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/start";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Plus, Search, FileText, Pill, Award, Printer } from "lucide-react";
+import { Plus, Search, FileText, Pill, Award, Printer, ChevronLeft, Clock } from "lucide-react";
 import { z } from "zod";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
@@ -55,7 +55,7 @@ const getPacienteRecords = createServerFn({ method: "GET" })
       db.query.certificates.findMany({
         where: and(eq(certificates.tenantId, tenantId), eq(certificates.pacienteId, data.pacienteId)),
         with: { professional: true },
-        orderBy: (r, { desc }) => [desc(r.data)],
+        orderBy: (r, { desc }) => [desc(r.dataInicio)],
       }),
     ]);
 
@@ -135,7 +135,7 @@ function ProntuariosPage() {
   const [pacienteSel, setPacienteSel] = useState<string | null>(pacienteIdParam ?? null);
 
   const { data: pageData } = useQuery({ queryKey: ["prontuarios-page"], queryFn: () => getProntuariosData() });
-  const { data: pacData, refetch: refetchPac } = useQuery({
+  const { data: pacData, isLoading: isLoadingPac } = useQuery({
     queryKey: ["prontuario-pac", pacienteSel],
     queryFn: () => pacienteSel ? getPacienteRecords({ data: { pacienteId: pacienteSel } }) : null,
     enabled: !!pacienteSel,
@@ -282,6 +282,139 @@ function ProntuariosPage() {
 
   const vias = ["Oral", "Tópico", "Injetável", "Inalatório", "Sublingual", "Retal"];
 
+  // Modo histórico: veio do card do paciente
+  const fromPatientCard = !!pacienteIdParam;
+
+  // Timeline combinada (prontuários + receitas + atestados) ordenada por data desc
+  type HItem = { tipo: "prontuario" | "receita" | "atestado"; data: string; item: any };
+  const historico: HItem[] = fromPatientCard && pacData
+    ? [
+        ...(pacData.prontuarios ?? []).map((r): HItem => ({ tipo: "prontuario", data: r.data, item: r })),
+        ...(pacData.receitas ?? []).map((r): HItem => ({ tipo: "receita", data: r.data, item: r })),
+        ...(pacData.atestados ?? []).map((r): HItem => ({ tipo: "atestado", data: r.dataInicio, item: r })),
+      ].sort((a, b) => b.data.localeCompare(a.data))
+    : [];
+
+  if (fromPatientCard) {
+    return (
+      <div className="space-y-5">
+        {/* Cabeçalho com voltar */}
+        <div className="flex items-center gap-3">
+          <Link to="/pacientes">
+            <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground">
+              <ChevronLeft className="h-4 w-4" /> Pacientes
+            </Button>
+          </Link>
+          <div className="h-4 w-px bg-border" />
+          <div>
+            <h2 className="text-lg font-bold leading-tight">{pacienteAtual?.nome ?? "Paciente"}</h2>
+            {pacienteAtual?.cpf && <p className="text-xs text-muted-foreground">CPF: {pacienteAtual.cpf}</p>}
+          </div>
+          <div className="ml-auto flex gap-2">
+            <Button size="sm" variant="outline" onClick={() => { setProProSel(""); setProData(new Date().toISOString().slice(0, 10)); setProQueixa(""); setProHist(""); setProExame(""); setProDiag(""); setProCid(""); setProConduta(""); setProRetorno(""); setProObs(""); setOpenPront(true); }}>
+              <FileText className="h-4 w-4" /> Prontuário
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => { setRecProSel(""); setRecData(new Date().toISOString().slice(0, 10)); setRecMeds([{ nome: "", dosagem: "", via: "Oral", posologia: "", duracao: "", quantidade: "" }]); setRecObs(""); setOpenRec(true); }}>
+              <Pill className="h-4 w-4" /> Receita
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => { setAtProSel(""); setAtData(new Date().toISOString().slice(0, 10)); setAtTipo("afastamento"); setAtDias(1); const h = new Date().toISOString().slice(0, 10); setAtDataInicio(h); setAtDataFim(h); setAtCid(""); setAtMotivo(""); setOpenAt(true); }}>
+              <Award className="h-4 w-4" /> Atestado
+            </Button>
+          </div>
+        </div>
+
+        {/* Histórico combinado */}
+        {isLoadingPac ? (
+          <p className="text-sm text-muted-foreground">Carregando histórico...</p>
+        ) : !historico.length ? (
+          <Card><CardContent className="py-12 text-center text-muted-foreground text-sm">
+            Nenhum registro encontrado para este paciente
+          </CardContent></Card>
+        ) : (
+          <div className="space-y-3">
+            {historico.map((entry, i) => {
+              if (entry.tipo === "prontuario") {
+                const r = entry.item;
+                return (
+                  <Card key={r.id} className="cursor-pointer hover:border-primary/30" onClick={() => setProntDetalhe(r)}>
+                    <CardContent className="p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="mt-0.5 rounded-full bg-primary/10 p-1.5"><FileText className="h-3.5 w-3.5 text-primary" /></div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-semibold text-primary uppercase tracking-wide">Prontuário</span>
+                            <span className="text-xs text-muted-foreground">{new Date(r.data + "T00:00:00").toLocaleDateString("pt-BR")}</span>
+                          </div>
+                          <p className="text-sm font-medium mt-0.5">{r.professional?.nome}</p>
+                          {r.queixaPrincipal && <p className="text-xs text-muted-foreground truncate">{r.queixaPrincipal}</p>}
+                          {r.diagnostico && <Badge variant="outline" className="mt-1 text-xs">{r.diagnostico}</Badge>}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              }
+              if (entry.tipo === "receita") {
+                const r = entry.item;
+                const meds: Medicamento[] = (() => { try { return JSON.parse(r.medicamentos); } catch { return []; } })();
+                return (
+                  <Card key={r.id}>
+                    <CardContent className="p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="mt-0.5 rounded-full bg-success/10 p-1.5"><Pill className="h-3.5 w-3.5 text-success" /></div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-semibold text-success uppercase tracking-wide">Receita</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground">{new Date(r.data + "T00:00:00").toLocaleDateString("pt-BR")}</span>
+                              <Button variant="outline" size="sm" className="h-6 text-xs px-2" onClick={() => {
+                                const prof = pageData?.profissionais.find((p) => p.id === r.professionalId);
+                                if (prof) printReceita({ nomePetShop: pageData?.nomeClinica ?? "", medico: prof.nome, registro: [prof.conselho, prof.registro, prof.uf].filter(Boolean).join(" "), paciente: pacienteAtual?.nome ?? "", data: r.data, medicamentos: meds, observacoes: r.observacoes ?? undefined });
+                              }}><Printer className="h-3 w-3" /></Button>
+                            </div>
+                          </div>
+                          <p className="text-sm font-medium mt-0.5">{r.professional?.nome}</p>
+                          <p className="text-xs text-muted-foreground truncate">{meds.map((m) => m.nome).filter(Boolean).join(", ")}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              }
+              if (entry.tipo === "atestado") {
+                const a = entry.item;
+                return (
+                  <Card key={a.id}>
+                    <CardContent className="p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="mt-0.5 rounded-full bg-warning/10 p-1.5"><Award className="h-3.5 w-3.5 text-warning" /></div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-semibold text-warning uppercase tracking-wide">Atestado</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground">{new Date(a.data + "T00:00:00").toLocaleDateString("pt-BR")}</span>
+                              <Button variant="outline" size="sm" className="h-6 text-xs px-2" onClick={() => {
+                                const prof = pageData?.profissionais.find((p) => p.id === a.professionalId);
+                                if (prof) printAtestado({ nomePetShop: pageData?.nomeClinica ?? "", cidade: a.cidade ?? pageData?.cidadeClinica ?? "", medico: prof.nome, registro: [prof.conselho, prof.registro, prof.uf].filter(Boolean).join(" "), paciente: pacienteAtual?.nome ?? "", cpf: pacienteAtual?.cpf ?? undefined, tipo: a.tipo, diasAfastamento: a.diasAfastamento, dataInicio: a.dataInicio, dataFim: a.dataFim, cid: a.cid ?? undefined, motivo: a.motivo ?? undefined, data: a.data });
+                              }}><Printer className="h-3 w-3" /></Button>
+                            </div>
+                          </div>
+                          <p className="text-sm font-medium mt-0.5">{a.professional?.nome}</p>
+                          <p className="text-xs text-muted-foreground capitalize">{a.tipo} · {a.diasAfastamento} dia(s)</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              }
+              return null;
+            })}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="-m-6 flex overflow-hidden" style={{ height: "calc(100vh - 56px)" }}>
       {/* Esquerda: lista pacientes */}
@@ -346,7 +479,9 @@ function ProntuariosPage() {
                   </Button>
                 </div>
                 <div className="space-y-3">
-                  {!pacData?.prontuarios.length ? (
+                  {isLoadingPac ? (
+                    <p className="text-sm text-muted-foreground">Carregando...</p>
+                  ) : !pacData?.prontuarios.length ? (
                     <p className="text-sm text-muted-foreground">Nenhum prontuário registrado</p>
                   ) : pacData.prontuarios.map((r) => (
                     <Card key={r.id} className="cursor-pointer hover:border-primary/30" onClick={() => setProntDetalhe(r)}>
@@ -377,7 +512,9 @@ function ProntuariosPage() {
                   </Button>
                 </div>
                 <div className="space-y-3">
-                  {!pacData?.receitas.length ? (
+                  {isLoadingPac ? (
+                    <p className="text-sm text-muted-foreground">Carregando...</p>
+                  ) : !pacData?.receitas.length ? (
                     <p className="text-sm text-muted-foreground">Nenhuma receita registrada</p>
                   ) : pacData.receitas.map((r) => {
                     const meds: Medicamento[] = (() => { try { return JSON.parse(r.medicamentos); } catch { return []; } })();
@@ -428,7 +565,9 @@ function ProntuariosPage() {
                   </Button>
                 </div>
                 <div className="space-y-3">
-                  {!pacData?.atestados.length ? (
+                  {isLoadingPac ? (
+                    <p className="text-sm text-muted-foreground">Carregando...</p>
+                  ) : !pacData?.atestados.length ? (
                     <p className="text-sm text-muted-foreground">Nenhum atestado registrado</p>
                   ) : pacData.atestados.map((a) => (
                     <Card key={a.id}>
