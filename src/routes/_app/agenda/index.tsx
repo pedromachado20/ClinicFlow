@@ -87,9 +87,49 @@ const alterarStatus = createServerFn({ method: "POST" })
     const { requireTenant } = await import("~/server/context");
     const { db } = await import("~/db");
     const { tenantId } = await requireTenant();
-    const { appointments } = await import("~/db/schema");
+    const { appointments, transacoes, patients } = await import("~/db/schema");
     const { eq, and } = await import("drizzle-orm");
-    await db.update(appointments).set({ status: data.status as any }).where(and(eq(appointments.id, data.id), eq(appointments.tenantId, tenantId)));
+
+    await db.update(appointments)
+      .set({ status: data.status as any })
+      .where(and(eq(appointments.id, data.id), eq(appointments.tenantId, tenantId)));
+
+    if (data.status === "concluido") {
+      const [appt] = await db.select({
+        tipoAtendimento: appointments.tipoAtendimento,
+        preco: appointments.preco,
+        pacienteId: appointments.pacienteId,
+        dataAppt: appointments.data,
+      })
+      .from(appointments)
+      .where(and(eq(appointments.id, data.id), eq(appointments.tenantId, tenantId)));
+
+      if (appt?.tipoAtendimento === "particular" && parseFloat(appt.preco || "0") > 0) {
+        const existing = await db.select({ id: transacoes.id })
+          .from(transacoes)
+          .where(and(eq(transacoes.tenantId, tenantId), eq(transacoes.referencia, data.id)));
+
+        if (!existing.length) {
+          const [pac] = await db.select({ nome: patients.nome })
+            .from(patients)
+            .where(eq(patients.id, appt.pacienteId));
+
+          await db.insert(transacoes).values({
+            id: crypto.randomUUID(),
+            tenantId,
+            tipo: "receita",
+            categoria: "Consultas Particular",
+            descricao: `Consulta - ${pac?.nome ?? "Paciente"}`,
+            valor: appt.preco,
+            data: appt.dataAppt,
+            pago: true,
+            status: "pago",
+            referencia: data.id,
+            pacienteId: appt.pacienteId,
+          });
+        }
+      }
+    }
   });
 
 const excluirAgendamento = createServerFn({ method: "POST" })
@@ -183,6 +223,7 @@ function AgendaPage() {
       qc.invalidateQueries({ queryKey: ["agenda"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
       qc.invalidateQueries({ queryKey: ["relatorios"] });
+      qc.invalidateQueries({ queryKey: ["financeiro"] });
       toast.success("Status atualizado");
     },
   });

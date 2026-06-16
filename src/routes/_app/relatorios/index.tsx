@@ -15,24 +15,24 @@ const getRelatorios = createServerFn({ method: "GET" }).handler(async () => {
   const hoje = new Date().toISOString().slice(0, 10);
   const inicioMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
 
+  // groupBy evita comparação de parâmetro text com coluna pgEnum (bug do driver Neon HTTP)
   const [
     totalPacientes,
     totalConsultas,
     receitaMes,
-    concluidas,
+    porStatusMes,
     topServicos,
-    tipoAtendimento,
-    consultasHoje,
+    porTipoMes,
+    porTipoHoje,
     receitaHoje,
-    particularHoje,
-    convenioHoje,
-    particularMes,
-    convenioMes,
   ] = await Promise.all([
     db.select({ count: count() }).from(patients).where(and(eq(patients.tenantId, tenantId), eq(patients.ativo, true))),
     db.select({ count: count() }).from(appointments).where(and(eq(appointments.tenantId, tenantId), gte(appointments.data, inicioMes))),
     db.select({ total: sql<string>`coalesce(sum(valor), 0)` }).from(transacoes).where(and(eq(transacoes.tenantId, tenantId), eq(transacoes.tipo, "receita"), gte(transacoes.data, inicioMes))),
-    db.select({ count: count() }).from(appointments).where(and(eq(appointments.tenantId, tenantId), gte(appointments.data, inicioMes), eq(appointments.status, "concluido"))),
+    db.select({ status: appointments.status, total: count() })
+      .from(appointments)
+      .where(and(eq(appointments.tenantId, tenantId), gte(appointments.data, inicioMes)))
+      .groupBy(appointments.status),
     db.select({ nome: services.nome, total: count() })
       .from(appointments)
       .leftJoin(services, eq(appointments.serviceId, services.id))
@@ -44,18 +44,24 @@ const getRelatorios = createServerFn({ method: "GET" }).handler(async () => {
       .from(appointments)
       .where(and(eq(appointments.tenantId, tenantId), gte(appointments.data, inicioMes)))
       .groupBy(appointments.tipoAtendimento),
-    db.select({ count: count() }).from(appointments).where(and(eq(appointments.tenantId, tenantId), eq(appointments.data, hoje))),
+    db.select({ tipo: appointments.tipoAtendimento, total: count() })
+      .from(appointments)
+      .where(and(eq(appointments.tenantId, tenantId), eq(appointments.data, hoje)))
+      .groupBy(appointments.tipoAtendimento),
     db.select({ total: sql<string>`coalesce(sum(valor), 0)` }).from(transacoes).where(and(eq(transacoes.tenantId, tenantId), eq(transacoes.tipo, "receita"), eq(transacoes.data, hoje))),
-    db.select({ count: count() }).from(appointments).where(and(eq(appointments.tenantId, tenantId), eq(appointments.data, hoje), eq(appointments.tipoAtendimento, "particular"))),
-    db.select({ count: count() }).from(appointments).where(and(eq(appointments.tenantId, tenantId), eq(appointments.data, hoje), eq(appointments.tipoAtendimento, "convenio"))),
-    db.select({ count: count() }).from(appointments).where(and(eq(appointments.tenantId, tenantId), gte(appointments.data, inicioMes), eq(appointments.tipoAtendimento, "particular"))),
-    db.select({ count: count() }).from(appointments).where(and(eq(appointments.tenantId, tenantId), gte(appointments.data, inicioMes), eq(appointments.tipoAtendimento, "convenio"))),
   ]);
 
   const totalConsultasMes = totalConsultas[0]?.count ?? 0;
+  const concluidas = porStatusMes.find((s) => s.status === "concluido")?.total ?? 0;
   const taxaComparecimento = totalConsultasMes > 0
-    ? Math.round(((concluidas[0]?.count ?? 0) / totalConsultasMes) * 100)
+    ? Math.round((concluidas / totalConsultasMes) * 100)
     : 0;
+
+  const consultasHoje = porTipoHoje.reduce((acc, t) => acc + t.total, 0);
+  const particularHoje = porTipoHoje.find((t) => t.tipo === "particular")?.total ?? 0;
+  const convenioHoje = porTipoHoje.find((t) => t.tipo === "convenio")?.total ?? 0;
+  const particularMes = porTipoMes.find((t) => t.tipo === "particular")?.total ?? 0;
+  const convenioMes = porTipoMes.find((t) => t.tipo === "convenio")?.total ?? 0;
 
   return {
     totalPacientes: totalPacientes[0]?.count ?? 0,
@@ -63,13 +69,13 @@ const getRelatorios = createServerFn({ method: "GET" }).handler(async () => {
     receitaMes: parseFloat(receitaMes[0]?.total ?? "0"),
     taxaComparecimento,
     topServicos,
-    tipoAtendimento,
-    consultasHoje: consultasHoje[0]?.count ?? 0,
+    tipoAtendimento: porTipoMes,
+    consultasHoje,
     receitaHoje: parseFloat(receitaHoje[0]?.total ?? "0"),
-    particularHoje: particularHoje[0]?.count ?? 0,
-    convenioHoje: convenioHoje[0]?.count ?? 0,
-    particularMes: particularMes[0]?.count ?? 0,
-    convenioMes: convenioMes[0]?.count ?? 0,
+    particularHoje,
+    convenioHoje,
+    particularMes,
+    convenioMes,
   };
 });
 

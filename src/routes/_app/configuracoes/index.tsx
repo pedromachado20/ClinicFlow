@@ -12,7 +12,7 @@ import { Label } from "~/components/ui/label";
 import { Switch } from "~/components/ui/switch";
 import { Badge } from "~/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
-import { Wifi } from "lucide-react";
+import { Wifi, BookOpen, ExternalLink, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 
 const getConfig = createServerFn({ method: "GET" }).handler(async () => {
@@ -316,6 +316,30 @@ function ConfiguracoesPage() {
 
           {provider === "z-api" && (
             <>
+              <div className="rounded-lg border border-info/30 bg-info/5 p-4 space-y-3">
+                <div className="flex items-center gap-2 text-sm font-semibold text-info">
+                  <BookOpen className="h-4 w-4" />
+                  Passo a passo — Z-API
+                </div>
+                <ol className="space-y-2 text-sm text-muted-foreground list-none">
+                  {[
+                    "Acesse z-api.io e crie uma conta (gratuita para testes)",
+                    'No painel, clique em "Nova Instância" e dê um nome (ex: clinicflow)',
+                    "Aguarde a instância ser criada e copie o ID da instância e o Token",
+                    "Vá em Segurança → Security Token e copie o Client Token",
+                    'Conecte o WhatsApp: clique em "Conectar" e escaneie o QR Code com o celular',
+                    "Cole os valores nos campos abaixo e salve. Teste com seu número.",
+                  ].map((step, i) => (
+                    <li key={i} className="flex gap-2">
+                      <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0 text-info" />
+                      <span>{step}</span>
+                    </li>
+                  ))}
+                </ol>
+                <p className="text-xs text-muted-foreground">
+                  A URL padrão da Z-API é <code className="bg-muted px-1 rounded text-xs">https://api.z-api.io</code>. Substitua pelo endpoint da sua instância se usar plano dedicado.
+                </p>
+              </div>
               <div className="space-y-1.5">
                 <Label>URL da Instância *</Label>
                 <Input value={wppUrl} onChange={(e) => setWppUrl(e.target.value)} placeholder="https://api.z-api.io" />
@@ -342,6 +366,31 @@ function ConfiguracoesPage() {
 
           {provider === "evolution" && (
             <>
+              <div className="rounded-lg border border-info/30 bg-info/5 p-4 space-y-3">
+                <div className="flex items-center gap-2 text-sm font-semibold text-info">
+                  <BookOpen className="h-4 w-4" />
+                  Passo a passo — Evolution API
+                </div>
+                <ol className="space-y-2 text-sm text-muted-foreground list-none">
+                  {[
+                    "Instale a Evolution API no seu servidor (VPS ou Docker). Documentação: doc.evolution-api.com",
+                    "Após instalar, acesse o painel e vá em Manager → Create Instance",
+                    "Defina um nome para a instância (ex: clinicflow) e clique em Criar",
+                    "Na instância criada, acesse QR Code e escaneie com o WhatsApp do celular",
+                    "Copie a API Key global (Settings → Global API Key) ou a key da instância",
+                    "Cole a URL do seu servidor, a API Key e o nome da instância nos campos abaixo e salve.",
+                  ].map((step, i) => (
+                    <li key={i} className="flex gap-2">
+                      <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0 text-info" />
+                      <span>{step}</span>
+                    </li>
+                  ))}
+                </ol>
+                <p className="text-xs text-muted-foreground">
+                  Exemplo de URL: <code className="bg-muted px-1 rounded text-xs">https://evolution.meuservidor.com.br</code> (sem barra no final).
+                  Se usar porta customizada, inclua na URL: <code className="bg-muted px-1 rounded text-xs">https://meuservidor.com:8080</code>
+                </p>
+              </div>
               <div className="space-y-1.5">
                 <Label>URL da API *</Label>
                 <Input value={wppUrl} onChange={(e) => setWppUrl(e.target.value)} placeholder="https://sua-evolution.com" />

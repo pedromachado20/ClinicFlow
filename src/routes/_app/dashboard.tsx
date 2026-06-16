@@ -9,49 +9,70 @@ const getDashboardData = createServerFn({ method: "GET" }).handler(async () => {
   const { requireTenant } = await import("~/server/context");
   const { db } = await import("~/db");
   const { tenantId } = await requireTenant();
-  const { eq, and, gte, sql, count } = await import("drizzle-orm");
-  const { appointments, patients, transacoes } = await import("~/db/schema");
+  const { eq, and, gte, sql, count, asc } = await import("drizzle-orm");
+  const { appointments, patients, transacoes, professionals, services } = await import("~/db/schema");
 
   const hoje = new Date().toISOString().slice(0, 10);
   const inicioMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
 
-  const [totalPacientes, consultasHoje, receitaMes, consultasMes, particularHoje, convenioHoje, particularMes, convenioMes] = await Promise.all([
+  // groupBy evita comparação de parâmetro text com coluna pgEnum (bug do driver Neon HTTP)
+  const [totalPacientes, porStatusMes, receitaMes, porTipoHoje, porTipoMes, proximasConsultas] = await Promise.all([
     db.select({ count: count() }).from(patients).where(and(eq(patients.tenantId, tenantId), eq(patients.ativo, true))),
-    db.select({ count: count() }).from(appointments).where(and(eq(appointments.tenantId, tenantId), eq(appointments.data, hoje))),
-    db.select({ total: sql<string>`coalesce(sum(valor), 0)` }).from(transacoes).where(and(eq(transacoes.tenantId, tenantId), eq(transacoes.tipo, "receita"), gte(transacoes.data, inicioMes))),
-    db.select({ count: count() }).from(appointments).where(and(eq(appointments.tenantId, tenantId), gte(appointments.data, inicioMes))),
-    db.select({ count: count() }).from(appointments).where(and(eq(appointments.tenantId, tenantId), eq(appointments.data, hoje), eq(appointments.tipoAtendimento, "particular"))),
-    db.select({ count: count() }).from(appointments).where(and(eq(appointments.tenantId, tenantId), eq(appointments.data, hoje), eq(appointments.tipoAtendimento, "convenio"))),
-    db.select({ count: count() }).from(appointments).where(and(eq(appointments.tenantId, tenantId), gte(appointments.data, inicioMes), eq(appointments.tipoAtendimento, "particular"))),
-    db.select({ count: count() }).from(appointments).where(and(eq(appointments.tenantId, tenantId), gte(appointments.data, inicioMes), eq(appointments.tipoAtendimento, "convenio"))),
+    db.select({ status: appointments.status, total: count() })
+      .from(appointments)
+      .where(and(eq(appointments.tenantId, tenantId), gte(appointments.data, inicioMes)))
+      .groupBy(appointments.status),
+    db.select({ total: sql<string>`coalesce(sum(valor), 0)` }).from(transacoes)
+      .where(and(eq(transacoes.tenantId, tenantId), eq(transacoes.tipo, "receita"), gte(transacoes.data, inicioMes))),
+    db.select({ tipo: appointments.tipoAtendimento, total: count() })
+      .from(appointments)
+      .where(and(eq(appointments.tenantId, tenantId), eq(appointments.data, hoje)))
+      .groupBy(appointments.tipoAtendimento),
+    db.select({ tipo: appointments.tipoAtendimento, total: count() })
+      .from(appointments)
+      .where(and(eq(appointments.tenantId, tenantId), gte(appointments.data, inicioMes)))
+      .groupBy(appointments.tipoAtendimento),
+    db.select({
+      id: appointments.id,
+      data: appointments.data,
+      horaInicio: appointments.horaInicio,
+      status: appointments.status,
+      tipoAtendimento: appointments.tipoAtendimento,
+      pacienteNome: patients.nome,
+      profissionalNome: professionals.nome,
+      serviceNome: services.nome,
+    })
+    .from(appointments)
+    .leftJoin(patients, eq(appointments.pacienteId, patients.id))
+    .leftJoin(professionals, eq(appointments.professionalId, professionals.id))
+    .leftJoin(services, eq(appointments.serviceId, services.id))
+    .where(and(eq(appointments.tenantId, tenantId), gte(appointments.data, hoje)))
+    .orderBy(asc(appointments.data), asc(appointments.horaInicio))
+    .limit(6),
   ]);
 
-  const totalConsultasMes = consultasMes[0]?.count ?? 0;
-  const totalConsultasHoje = consultasHoje[0]?.count ?? 0;
-  const concluidas = await db.select({ count: count() }).from(appointments).where(
-    and(eq(appointments.tenantId, tenantId), gte(appointments.data, inicioMes), eq(appointments.status, "concluido"))
-  );
+  const totalConsultasMes = porStatusMes.reduce((acc, s) => acc + s.total, 0);
+  const concluidas = porStatusMes.find((s) => s.status === "concluido")?.total ?? 0;
   const taxaComparecimento = totalConsultasMes > 0
-    ? Math.round(((concluidas[0]?.count ?? 0) / totalConsultasMes) * 100)
+    ? Math.round((concluidas / totalConsultasMes) * 100)
     : 0;
 
-  const proximasConsultas = await db.query.appointments.findMany({
-    where: and(eq(appointments.tenantId, tenantId), gte(appointments.data, hoje)),
-    with: { paciente: true, professional: true, service: true },
-    orderBy: (a, { asc }) => [asc(a.data), asc(a.horaInicio)],
-    limit: 6,
-  });
+  const consultasHoje = porTipoHoje.reduce((acc, t) => acc + t.total, 0);
+  const particularHoje = porTipoHoje.find((t) => t.tipo === "particular")?.total ?? 0;
+  const convenioHoje = porTipoHoje.find((t) => t.tipo === "convenio")?.total ?? 0;
+  const particularMes = porTipoMes.find((t) => t.tipo === "particular")?.total ?? 0;
+  const convenioMes = porTipoMes.find((t) => t.tipo === "convenio")?.total ?? 0;
 
   return {
     totalPacientes: totalPacientes[0]?.count ?? 0,
-    consultasHoje: totalConsultasHoje,
+    consultasHoje,
     totalConsultasMes,
     receitaMes: parseFloat(receitaMes[0]?.total ?? "0"),
     taxaComparecimento,
-    particularHoje: particularHoje[0]?.count ?? 0,
-    convenioHoje: convenioHoje[0]?.count ?? 0,
-    particularMes: particularMes[0]?.count ?? 0,
-    convenioMes: convenioMes[0]?.count ?? 0,
+    particularHoje,
+    convenioHoje,
+    particularMes,
+    convenioMes,
     proximasConsultas,
   };
 });
@@ -160,9 +181,9 @@ function DashboardPage() {
               {data.proximasConsultas.map((a) => (
                 <div key={a.id} className="flex items-center justify-between rounded-lg border border-border p-3">
                   <div>
-                    <p className="font-medium text-sm">{a.paciente?.nome}</p>
+                    <p className="font-medium text-sm">{a.pacienteNome}</p>
                     <p className="text-xs text-muted-foreground">
-                      {a.service?.nome} · {a.professional?.nome} · {new Date(a.data + "T00:00:00").toLocaleDateString("pt-BR")} {a.horaInicio}
+                      {a.serviceNome} · {a.profissionalNome} · {new Date(a.data + "T00:00:00").toLocaleDateString("pt-BR")} {a.horaInicio}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">

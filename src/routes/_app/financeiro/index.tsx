@@ -20,7 +20,7 @@ const getFinanceiro = createServerFn({ method: "GET" }).handler(async () => {
   const { requireTenant } = await import("~/server/context");
   const { db } = await import("~/db");
   const { tenantId } = await requireTenant();
-  const { eq, and, gte, sql } = await import("drizzle-orm");
+  const { eq, and, gte, sql, desc } = await import("drizzle-orm");
   const { transacoes } = await import("~/db/schema");
 
   const hoje = new Date().toISOString().slice(0, 10);
@@ -31,11 +31,19 @@ const getFinanceiro = createServerFn({ method: "GET" }).handler(async () => {
     db.select({ total: sql<string>`coalesce(sum(valor), 0)` }).from(transacoes).where(and(eq(transacoes.tenantId, tenantId), eq(transacoes.tipo, "despesa"), gte(transacoes.data, inicioMes))),
     db.select({ total: sql<string>`coalesce(sum(valor), 0)` }).from(transacoes).where(and(eq(transacoes.tenantId, tenantId), eq(transacoes.tipo, "receita"), eq(transacoes.data, hoje))),
     db.select({ total: sql<string>`coalesce(sum(valor), 0)` }).from(transacoes).where(and(eq(transacoes.tenantId, tenantId), eq(transacoes.tipo, "despesa"), eq(transacoes.data, hoje))),
-    db.query.transacoes.findMany({
-      where: and(eq(transacoes.tenantId, tenantId), gte(transacoes.data, inicioMes)),
-      orderBy: (t, { desc }) => [desc(t.data), desc(t.createdAt)],
-      limit: 50,
-    }),
+    db.select({
+      id: transacoes.id,
+      tipo: transacoes.tipo,
+      categoria: transacoes.categoria,
+      descricao: transacoes.descricao,
+      valor: transacoes.valor,
+      data: transacoes.data,
+      createdAt: transacoes.createdAt,
+    })
+    .from(transacoes)
+    .where(and(eq(transacoes.tenantId, tenantId), gte(transacoes.data, inicioMes)))
+    .orderBy(desc(transacoes.data), desc(transacoes.createdAt))
+    .limit(50),
   ]);
 
   const totalReceitas = parseFloat(receitas[0]?.total ?? "0");
