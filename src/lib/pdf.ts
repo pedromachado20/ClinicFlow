@@ -109,6 +109,61 @@ export function printCupom(opts: {
   </body></html>`);
 }
 
+export function printProntuario(opts: {
+  nomeClinica: string;
+  medico: string;
+  registro: string;
+  paciente: string;
+  data: string;
+  queixaPrincipal?: string;
+  historicoClinico?: string;
+  exameClinico?: string;
+  diagnostico?: string;
+  cid?: string;
+  conduta?: string;
+  retorno?: string;
+  observacoes?: string;
+}) {
+  const campo = (label: string, valor?: string) => valor
+    ? `<div class="campo"><div class="label">${label}</div><div>${valor}</div></div>`
+    : "";
+  openPrint(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Prontuário</title>
+    <style>
+      ${BASE_CSS}
+      body { font-family: Arial, sans-serif; font-size: 12px; padding: 30px; max-width: 700px; margin: 0 auto; }
+      .header { border-bottom: 2px solid #111; padding-bottom: 12px; margin-bottom: 20px; }
+      .header h1 { font-size: 18px; margin: 0 0 2px; }
+      .header .sub { font-size: 11px; color: #555; }
+      .campo { margin: 12px 0; }
+      .label { font-size: 9px; font-weight: bold; text-transform: uppercase; letter-spacing: .5px; color: #666; margin-bottom: 3px; }
+      .divider { border: none; border-top: 1px solid #eee; margin: 14px 0; }
+      .footer-sig { margin-top: 60px; border-top: 1px solid #999; padding-top: 8px; text-align: center; font-size: 11px; }
+      @media print { body { padding: 15px; } }
+    </style></head><body>
+    <div class="header">
+      <h1>PRONTUÁRIO MÉDICO</h1>
+      <div class="sub">${opts.nomeClinica}</div>
+    </div>
+    <div class="campo"><div class="label">Paciente</div><div><strong>${opts.paciente}</strong></div></div>
+    <div class="campo"><div class="label">Data</div><div>${new Date(opts.data + "T00:00:00").toLocaleDateString("pt-BR")}</div></div>
+    <hr class="divider">
+    ${campo("Queixa Principal", opts.queixaPrincipal)}
+    ${campo("Histórico Clínico", opts.historicoClinico)}
+    ${campo("Exame Clínico", opts.exameClinico)}
+    <hr class="divider">
+    ${campo("Diagnóstico", opts.diagnostico)}
+    ${campo("CID-10", opts.cid)}
+    ${campo("Conduta", opts.conduta)}
+    ${campo("Retorno", opts.retorno)}
+    ${campo("Observações", opts.observacoes)}
+    <div class="footer-sig">
+      ___________________________<br>
+      ${opts.medico}<br>
+      <span style="color:#555;font-size:10px">${opts.registro}</span>
+    </div>
+  </body></html>`);
+}
+
 export function printReceita(opts: {
   nomePetShop: string;
   medico: string;
