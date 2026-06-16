@@ -18,7 +18,7 @@ const getRelatorios = createServerFn({ method: "GET" }).handler(async () => {
   const inicioMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
 
   // Usa sql`` com literais inline para colunas pgEnum — evita bug de cast text→enum no Neon HTTP
-  const [pacTotal, mesStat, receitaMes, topServicos, hojeStat, receitaHoje, tenant] = await Promise.all([
+  const [pacTotal, mesStat, receitaMes, topServicos, hojeStat, receitaHoje, tenant, servicosTipo] = await Promise.all([
     db.select({ n: sql<string>`count(*)` })
       .from(patients)
       .where(and(eq(patients.tenantId, tenantId), sql`${patients.ativo} = true`)),
@@ -57,6 +57,18 @@ const getRelatorios = createServerFn({ method: "GET" }).handler(async () => {
       .where(and(eq(transacoes.tenantId, tenantId), eq(transacoes.tipo, "receita"), eq(transacoes.data, hoje))),
 
     db.query.tenants.findFirst({ where: eq(tenants.id, tenantId), columns: { nome: true } }),
+
+    db.select({
+      nomeServico: services.nome,
+      tipoAtendimento: appointments.tipoAtendimento,
+      total:    sql<string>`count(*)`,
+      receita:  sql<string>`coalesce(sum(case when tipo_atendimento = 'particular' then ${appointments.preco}::numeric else 0 end), 0)`,
+    })
+    .from(appointments)
+    .leftJoin(services, eq(appointments.serviceId, services.id))
+    .where(and(eq(appointments.tenantId, tenantId), gte(appointments.data, inicioMes)))
+    .groupBy(services.nome, appointments.tipoAtendimento)
+    .orderBy(services.nome, appointments.tipoAtendimento),
   ]);
 
   const int = (v?: string | null) => parseInt(v ?? "0", 10);
@@ -67,6 +79,20 @@ const getRelatorios = createServerFn({ method: "GET" }).handler(async () => {
   const consultasHoje = int(hojeStat[0]?.total);
   const particularHoje = int(hojeStat[0]?.particular);
   const convenioHoje = int(hojeStat[0]?.convenio);
+
+  // Agrupa por serviço mesclando particular + convênio em uma linha por serviço
+  const servicosMap = new Map<string, { particular: number; convenio: number; receita: number }>();
+  for (const row of servicosTipo) {
+    const nome = row.nomeServico ?? "Serviço removido";
+    if (!servicosMap.has(nome)) servicosMap.set(nome, { particular: 0, convenio: 0, receita: 0 });
+    const s = servicosMap.get(nome)!;
+    const qt = parseInt(row.total, 10);
+    if (row.tipoAtendimento === "particular") { s.particular += qt; s.receita += parseFloat(row.receita); }
+    else { s.convenio += qt; }
+  }
+  const servicosPorTipo = Array.from(servicosMap.entries())
+    .map(([nome, v]) => ({ nome, ...v, total: v.particular + v.convenio }))
+    .sort((a, b) => b.total - a.total);
 
   return {
     nomeClinica:       tenant?.nome ?? "Clínica",
@@ -85,6 +111,7 @@ const getRelatorios = createServerFn({ method: "GET" }).handler(async () => {
     convenioHoje,
     particularMes,
     convenioMes,
+    servicosPorTipo,
   };
 });
 
@@ -121,6 +148,7 @@ function RelatoriosPage() {
           particularMes: data.particularMes,
           convenioMes: data.convenioMes,
           topServicos: data.topServicos,
+          servicosPorTipo: data.servicosPorTipo,
         })}>
           <Printer className="h-4 w-4" /> PDF
         </Button>
@@ -280,6 +308,54 @@ function RelatoriosPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Serviços x Particular / Convênio */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Serviços Realizados — Particular vs Convênio</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <p className="text-sm text-muted-foreground">Carregando...</p>
+          ) : !data?.servicosPorTipo?.length ? (
+            <p className="text-sm text-muted-foreground">Sem atendimentos este mês</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border text-xs text-muted-foreground uppercase tracking-wide">
+                    <th className="text-left py-2 font-medium">Serviço</th>
+                    <th className="text-right py-2 font-medium">Particular</th>
+                    <th className="text-right py-2 font-medium">Convênio</th>
+                    <th className="text-right py-2 font-medium">Total</th>
+                    <th className="text-right py-2 font-medium">Receita (part.)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.servicosPorTipo.map((s, i) => (
+                    <tr key={i} className="border-b border-border/50 last:border-0">
+                      <td className="py-2 font-medium">{s.nome}</td>
+                      <td className="py-2 text-right text-primary">{s.particular}</td>
+                      <td className="py-2 text-right text-warning">{s.convenio}</td>
+                      <td className="py-2 text-right font-semibold">{s.total}</td>
+                      <td className="py-2 text-right text-success">{formatCurrency(s.receita)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t-2 border-border font-bold">
+                    <td className="py-2">Total</td>
+                    <td className="py-2 text-right text-primary">{data.servicosPorTipo.reduce((s, r) => s + r.particular, 0)}</td>
+                    <td className="py-2 text-right text-warning">{data.servicosPorTipo.reduce((s, r) => s + r.convenio, 0)}</td>
+                    <td className="py-2 text-right">{data.servicosPorTipo.reduce((s, r) => s + r.total, 0)}</td>
+                    <td className="py-2 text-right text-success">{formatCurrency(data.servicosPorTipo.reduce((s, r) => s + r.receita, 0))}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Faturamento */}
       <Card>

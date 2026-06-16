@@ -33,6 +33,7 @@ export function printRelatorio(opts: {
   particularMes: number;
   convenioMes: number;
   topServicos: { nome: string | null; total: number }[];
+  servicosPorTipo?: { nome: string; particular: number; convenio: number; total: number; receita: number }[];
 }) {
   const fmtR = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
   const mes = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
@@ -105,6 +106,23 @@ export function printRelatorio(opts: {
     <div class="section-title">Top Serviços do Mês</div>
     <table><thead><tr><th>#</th><th>Serviço</th><th style="text-align:right">Qtd</th></tr></thead>
     <tbody>${topRows}</tbody></table>` : ""}
+
+    ${opts.servicosPorTipo?.length ? `
+    <div class="section-title">Serviços Realizados — Particular vs Convênio</div>
+    <table>
+      <thead><tr><th>Serviço</th><th style="text-align:right">Particular</th><th style="text-align:right">Convênio</th><th style="text-align:right">Total</th><th style="text-align:right">Receita (part.)</th></tr></thead>
+      <tbody>
+        ${opts.servicosPorTipo.map((s) => `
+          <tr><td>${s.nome}</td><td style="text-align:right;color:#2563eb">${s.particular}</td><td style="text-align:right;color:#d97706">${s.convenio}</td><td style="text-align:right;font-weight:bold">${s.total}</td><td style="text-align:right;color:#16a34a">${fmtR(s.receita)}</td></tr>`).join("")}
+        <tr style="font-weight:bold;border-top:2px solid #ddd">
+          <td>Total</td>
+          <td style="text-align:right;color:#2563eb">${opts.servicosPorTipo.reduce((s, r) => s + r.particular, 0)}</td>
+          <td style="text-align:right;color:#d97706">${opts.servicosPorTipo.reduce((s, r) => s + r.convenio, 0)}</td>
+          <td style="text-align:right">${opts.servicosPorTipo.reduce((s, r) => s + r.total, 0)}</td>
+          <td style="text-align:right;color:#16a34a">${fmtR(opts.servicosPorTipo.reduce((s, r) => s + r.receita, 0))}</td>
+        </tr>
+      </tbody>
+    </table>` : ""}
 
     <div class="section-title">Faturamento do Mês</div>
     <div class="kpi-grid-2">

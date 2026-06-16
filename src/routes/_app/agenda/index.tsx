@@ -55,10 +55,31 @@ const salvarAgendamento = createServerFn({ method: "POST" })
     const { requireTenant } = await import("~/server/context");
     const { db } = await import("~/db");
     const { tenantId } = await requireTenant();
-    const { appointments, services } = await import("~/db/schema");
+    const { appointments, services, patients, professionals, tenants } = await import("~/db/schema");
     const { eq, and } = await import("drizzle-orm");
 
-    const service = await db.query.services.findFirst({ where: eq(services.id, data.serviceId) });
+    const [service, paciente, profissional, tenant] = await Promise.all([
+      db.query.services.findFirst({ where: eq(services.id, data.serviceId) }),
+      db.query.patients.findFirst({ where: eq(patients.id, data.pacienteId), columns: { nome: true, telefone: true } }),
+      db.query.professionals.findFirst({ where: eq(professionals.id, data.professionalId), columns: { nome: true } }),
+      db.query.tenants.findFirst({ where: eq(tenants.id, tenantId), columns: { nome: true, notifAgendamento: true } }),
+    ]);
+
+    // Valida conflito de horário para o mesmo profissional
+    const { and: $and, eq: $eq, ne, sql: $sql } = await import("drizzle-orm");
+    const conflito = await db.select({ id: appointments.id })
+      .from(appointments)
+      .where(
+        $and(
+          $eq(appointments.tenantId, tenantId),
+          $eq(appointments.professionalId, data.professionalId),
+          $eq(appointments.data, data.data),
+          data.id ? ne(appointments.id, data.id) : undefined,
+          $sql`${appointments.horaInicio} < ${data.horaFim} AND ${appointments.horaFim} > ${data.horaInicio}`,
+        )
+      )
+      .limit(1);
+    if (conflito.length > 0) throw new Error("Conflito de horário: profissional já tem agendamento nesse período.");
 
     if (data.id) {
       await db.update(appointments)
@@ -78,6 +99,18 @@ const salvarAgendamento = createServerFn({ method: "POST" })
         tipoAtendimento: (data.tipoAtendimento ?? "particular") as any,
         convenio: data.convenio, preco: service?.preco ?? "0", observacoes: data.observacoes,
       });
+
+      // WhatsApp: notificação de novo agendamento
+      if (tenant?.notifAgendamento && paciente?.telefone) {
+        const { enviarWhatsapp } = await import("~/server/whatsapp");
+        const dataFmt = new Date(data.data + "T00:00:00").toLocaleDateString("pt-BR");
+        await enviarWhatsapp(
+          tenantId,
+          paciente.telefone,
+          `Olá, ${paciente.nome}! Seu agendamento foi confirmado em ${tenant.nome}.\n` +
+          `📅 ${dataFmt} às ${data.horaInicio}\n👨‍⚕️ ${profissional?.nome ?? ""}`
+        );
+      }
     }
   });
 
@@ -87,12 +120,22 @@ const alterarStatus = createServerFn({ method: "POST" })
     const { requireTenant } = await import("~/server/context");
     const { db } = await import("~/db");
     const { tenantId } = await requireTenant();
-    const { appointments, transacoes, patients } = await import("~/db/schema");
+    const { appointments, transacoes, patients, tenants } = await import("~/db/schema");
     const { eq, and } = await import("drizzle-orm");
+
+    const [apptAntes] = await db.select({ status: appointments.status })
+      .from(appointments)
+      .where(and(eq(appointments.id, data.id), eq(appointments.tenantId, tenantId)));
 
     await db.update(appointments)
       .set({ status: data.status as any })
       .where(and(eq(appointments.id, data.id), eq(appointments.tenantId, tenantId)));
+
+    // Reverte auto-transação se sair de "concluido" para outro status
+    if (apptAntes?.status === "concluido" && data.status !== "concluido") {
+      await db.delete(transacoes)
+        .where(and(eq(transacoes.tenantId, tenantId), eq(transacoes.referencia, data.id)));
+    }
 
     if (data.status === "concluido") {
       const [appt] = await db.select({
@@ -128,6 +171,28 @@ const alterarStatus = createServerFn({ method: "POST" })
             pacienteId: appt.pacienteId,
           });
         }
+      }
+    }
+
+    // WhatsApp: lembrete ao confirmar agendamento
+    if (data.status === "confirmado") {
+      const appt = await db.query.appointments.findFirst({
+        where: and(eq(appointments.id, data.id), eq(appointments.tenantId, tenantId)),
+        with: { paciente: true, professional: true },
+      });
+      const tenant = await db.query.tenants.findFirst({
+        where: eq(tenants.id, tenantId),
+        columns: { nome: true, notifLembrete: true },
+      });
+      if (tenant?.notifLembrete && appt?.paciente?.telefone) {
+        const { enviarWhatsapp } = await import("~/server/whatsapp");
+        const dataFmt = new Date(appt.data + "T00:00:00").toLocaleDateString("pt-BR");
+        await enviarWhatsapp(
+          tenantId,
+          appt.paciente.telefone,
+          `Olá, ${appt.paciente.nome}! Lembramos que seu atendimento em ${tenant.nome} está confirmado.\n` +
+          `📅 ${dataFmt} às ${appt.horaInicio}\n👨‍⚕️ ${appt.professional?.nome ?? ""}`
+        );
       }
     }
   });
@@ -214,7 +279,7 @@ function AgendaPage() {
       toast.success(editando ? "Atualizado" : "Agendado");
       setOpen(false);
     },
-    onError: () => toast.error("Erro ao salvar"),
+    onError: (e: any) => toast.error(e?.message ?? "Erro ao salvar"),
   });
 
   const mudarStatus = useMutation({

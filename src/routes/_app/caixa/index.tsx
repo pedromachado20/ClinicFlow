@@ -70,19 +70,27 @@ const registrarPagamento = createServerFn({ method: "POST" })
     desconto: z.coerce.number(),
     formaPagamento: z.string(),
     descricao: z.string(),
+    appointmentIds: z.array(z.string()).optional(),
   }))
   .handler(async ({ data }) => {
     const { requireTenant } = await import("~/server/context");
     const { db } = await import("~/db");
     const { tenantId } = await requireTenant();
     const { transacoes } = await import("~/db/schema");
-    const { eq, and } = await import("drizzle-orm");
+    const { eq, and, inArray } = await import("drizzle-orm");
 
     const refKey = `caixa-${data.pacienteId}-${data.data}`;
     const existing = await db.query.transacoes.findFirst({
       where: and(eq(transacoes.tenantId, tenantId), eq(transacoes.referencia, refKey)),
     });
     if (existing) throw new Error("Pagamento já registrado");
+
+    // Remove auto-transações criadas pela Agenda ao marcar como concluído
+    if (data.appointmentIds?.length) {
+      await db.delete(transacoes).where(
+        and(eq(transacoes.tenantId, tenantId), inArray(transacoes.referencia, data.appointmentIds))
+      );
+    }
 
     await db.insert(transacoes).values({
       id: crypto.randomUUID(), tenantId,
@@ -125,6 +133,7 @@ function CaixaPage() {
           pacienteId: vars.pacienteId, data: dataAtual, valor: vars.valor, desconto: vars.desconto,
           formaPagamento,
           descricao: `Atendimento ${dataAtual} · ${formaPagamento} · ${selecionado?.paciente.nome ?? ""}`,
+          appointmentIds: selecionado?.appointments.map((a) => a.id),
         },
       }),
     onSuccess: async () => {
