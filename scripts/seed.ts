@@ -17,17 +17,20 @@ const db = drizzle(sql, { schema });
 // Aceita tenant_id via variável de ambiente para popular conta real
 // Ex: SEED_TENANT_ID=xxxx npx tsx scripts/seed.ts
 const TENANT_ID = process.env.SEED_TENANT_ID ?? "seed-clinicflow-tenant-001";
-const PROF_CARLOS = "seed-prof-carlos-001";
-const PROF_ANA    = "seed-prof-ana-001";
-const PROF_PAULO  = "seed-prof-paulo-001";
 
-const SVC_CONSULTA_MEDICA = "seed-svc-consulta-medica";
-const SVC_RETORNO         = "seed-svc-retorno";
-const SVC_CONSULTA_DENTAL = "seed-svc-consulta-dental";
-const SVC_SESSAO_PSICO    = "seed-svc-sessao-psico";
-const SVC_EXAME_SANGUE    = "seed-svc-exame-sangue";
+// IDs baseados no tenant para permitir seed em múltiplos tenants
+const T = TENANT_ID.slice(0, 8);
+const PROF_CARLOS = `${T}-prof-carlos`;
+const PROF_ANA    = `${T}-prof-ana`;
+const PROF_PAULO  = `${T}-prof-paulo`;
 
-const pacienteIds = Array.from({ length: 10 }, (_, i) => `seed-pac-${String(i + 1).padStart(3, "0")}`);
+const SVC_CONSULTA_MEDICA = `${T}-svc-consulta-med`;
+const SVC_RETORNO         = `${T}-svc-retorno`;
+const SVC_CONSULTA_DENTAL = `${T}-svc-consulta-dnt`;
+const SVC_SESSAO_PSICO    = `${T}-svc-sessao-psico`;
+const SVC_EXAME_SANGUE    = `${T}-svc-exame-sangue`;
+
+const pacienteIds = Array.from({ length: 10 }, (_, i) => `${T}-pac-${String(i + 1).padStart(3, "0")}`);
 
 const hoje = new Date();
 function diasRelativo(delta: number) {
@@ -191,7 +194,7 @@ async function main() {
     { dia:   5, hora: "16:00", fim: "16:50", pac: 9, prof: PROF_PAULO,  svc: SVC_SESSAO_PSICO,    status: "agendado"  as const, tipo: "particular" as const, preco: "180.00" },
   ];
 
-  const apptIds = agendamentoData.map((_, i) => `seed-appt-${String(i + 1).padStart(3, "0")}`);
+  const apptIds = agendamentoData.map((_, i) => `${T}-appt-${String(i + 1).padStart(3, "0")}`);
 
   await db.insert(schema.appointments).values(
     agendamentoData.map((a, i) => ({
@@ -211,7 +214,7 @@ async function main() {
   ).onConflictDoNothing();
 
   // 6. Prontuários (5)
-  const recordIds = Array.from({ length: 5 }, (_, i) => `seed-rec-${String(i + 1).padStart(3, "0")}`);
+  const recordIds = Array.from({ length: 5 }, (_, i) => `${T}-rec-${String(i + 1).padStart(3, "0")}`);
 
   await db.insert(schema.records).values([
     {
@@ -289,7 +292,7 @@ async function main() {
   // 7. Receitas (3)
   await db.insert(schema.prescriptions).values([
     {
-      id: "seed-presc-001",
+      id: `${T}-presc-001`,
       tenantId: TENANT_ID,
       pacienteId: pacienteIds[0],
       professionalId: PROF_CARLOS,
@@ -302,7 +305,7 @@ async function main() {
       observacoes: "Evitar álcool durante o tratamento",
     },
     {
-      id: "seed-presc-002",
+      id: `${T}-presc-002`,
       tenantId: TENANT_ID,
       pacienteId: pacienteIds[3],
       professionalId: PROF_CARLOS,
@@ -314,7 +317,7 @@ async function main() {
       ]),
     },
     {
-      id: "seed-presc-003",
+      id: `${T}-presc-003`,
       tenantId: TENANT_ID,
       pacienteId: pacienteIds[4],
       professionalId: PROF_CARLOS,
@@ -331,7 +334,7 @@ async function main() {
   // 8. Atestados (2)
   await db.insert(schema.certificates).values([
     {
-      id: "seed-cert-001",
+      id: `${T}-cert-001`,
       tenantId: TENANT_ID,
       pacienteId: pacienteIds[1],
       professionalId: PROF_PAULO,
@@ -345,7 +348,7 @@ async function main() {
       cidade: "São Paulo",
     },
     {
-      id: "seed-cert-002",
+      id: `${T}-cert-002`,
       tenantId: TENANT_ID,
       pacienteId: pacienteIds[3],
       professionalId: PROF_CARLOS,
@@ -384,7 +387,7 @@ async function main() {
 
   await db.insert(schema.transacoes).values([
     ...receitas.map((r, i) => ({
-      id: `seed-txn-rec-${String(i + 1).padStart(3, "0")}`,
+      id: `${T}-txn-rec-${String(i + 1).padStart(3, "0")}`,
       tenantId: TENANT_ID,
       tipo: "receita",
       categoria: r.cat,
@@ -395,7 +398,7 @@ async function main() {
       status: "pago",
     })),
     ...despesas.map((d, i) => ({
-      id: `seed-txn-des-${String(i + 1).padStart(3, "0")}`,
+      id: `${T}-txn-des-${String(i + 1).padStart(3, "0")}`,
       tenantId: TENANT_ID,
       tipo: "despesa",
       categoria: d.cat,
