@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/start";
 import { useQuery } from "@tanstack/react-query";
-import { CalendarDays, Users, DollarSign, TrendingUp } from "lucide-react";
+import { CalendarDays, Users, DollarSign, TrendingUp, Activity } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { formatCurrency } from "~/lib/utils";
 
@@ -15,11 +15,15 @@ const getDashboardData = createServerFn({ method: "GET" }).handler(async () => {
   const hoje = new Date().toISOString().slice(0, 10);
   const inicioMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
 
-  const [totalPacientes, consultasHoje, receitaMes, consultasMes] = await Promise.all([
+  const [totalPacientes, consultasHoje, receitaMes, consultasMes, particularHoje, convenioHoje, particularMes, convenioMes] = await Promise.all([
     db.select({ count: count() }).from(patients).where(and(eq(patients.tenantId, tenantId), eq(patients.ativo, true))),
     db.select({ count: count() }).from(appointments).where(and(eq(appointments.tenantId, tenantId), eq(appointments.data, hoje))),
     db.select({ total: sql<string>`coalesce(sum(valor), 0)` }).from(transacoes).where(and(eq(transacoes.tenantId, tenantId), eq(transacoes.tipo, "receita"), gte(transacoes.data, inicioMes))),
     db.select({ count: count() }).from(appointments).where(and(eq(appointments.tenantId, tenantId), gte(appointments.data, inicioMes))),
+    db.select({ count: count() }).from(appointments).where(and(eq(appointments.tenantId, tenantId), eq(appointments.data, hoje), eq(appointments.tipoAtendimento, "particular"))),
+    db.select({ count: count() }).from(appointments).where(and(eq(appointments.tenantId, tenantId), eq(appointments.data, hoje), eq(appointments.tipoAtendimento, "convenio"))),
+    db.select({ count: count() }).from(appointments).where(and(eq(appointments.tenantId, tenantId), gte(appointments.data, inicioMes), eq(appointments.tipoAtendimento, "particular"))),
+    db.select({ count: count() }).from(appointments).where(and(eq(appointments.tenantId, tenantId), gte(appointments.data, inicioMes), eq(appointments.tipoAtendimento, "convenio"))),
   ]);
 
   const totalConsultasMes = consultasMes[0]?.count ?? 0;
@@ -41,8 +45,13 @@ const getDashboardData = createServerFn({ method: "GET" }).handler(async () => {
   return {
     totalPacientes: totalPacientes[0]?.count ?? 0,
     consultasHoje: totalConsultasHoje,
+    totalConsultasMes,
     receitaMes: parseFloat(receitaMes[0]?.total ?? "0"),
     taxaComparecimento,
+    particularHoje: particularHoje[0]?.count ?? 0,
+    convenioHoje: convenioHoje[0]?.count ?? 0,
+    particularMes: particularMes[0]?.count ?? 0,
+    convenioMes: convenioMes[0]?.count ?? 0,
     proximasConsultas,
   };
 });
@@ -67,12 +76,7 @@ function DashboardPage() {
     queryFn: () => getDashboardData(),
   });
 
-  const kpis = [
-    { label: "Consultas Hoje", value: data?.consultasHoje ?? 0, icon: CalendarDays, color: "text-primary" },
-    { label: "Pacientes Ativos", value: data?.totalPacientes ?? 0, icon: Users, color: "text-info" },
-    { label: "Receita do Mês", value: formatCurrency(data?.receitaMes ?? 0), icon: DollarSign, color: "text-success" },
-    { label: "Taxa de Comparecimento", value: `${data?.taxaComparecimento ?? 0}%`, icon: TrendingUp, color: "text-warning" },
-  ];
+  const val = (v: number | string) => isLoading ? "..." : v;
 
   return (
     <div className="space-y-6">
@@ -81,20 +85,67 @@ function DashboardPage() {
         <p className="text-sm text-muted-foreground">Resumo da sua clínica</p>
       </div>
 
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-        {kpis.map((kpi) => (
-          <Card key={kpi.label}>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">{kpi.label}</CardTitle>
-              <kpi.icon className={`h-4 w-4 ${kpi.color}`} />
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold">{isLoading ? "..." : kpi.value}</p>
-            </CardContent>
-          </Card>
-        ))}
+      {/* KPIs principais */}
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-5">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Consultas Hoje</CardTitle>
+            <CalendarDays className="h-4 w-4 text-primary" />
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold">{val(data?.consultasHoje ?? 0)}</p>
+            {!isLoading && (
+              <p className="text-xs text-muted-foreground mt-1">
+                {data?.particularHoje ?? 0} particular · {data?.convenioHoje ?? 0} convênio
+              </p>
+            )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Consultas no Mês</CardTitle>
+            <Activity className="h-4 w-4 text-info" />
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold">{val(data?.totalConsultasMes ?? 0)}</p>
+            {!isLoading && (
+              <p className="text-xs text-muted-foreground mt-1">
+                {data?.particularMes ?? 0} particular · {data?.convenioMes ?? 0} convênio
+              </p>
+            )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Pacientes Ativos</CardTitle>
+            <Users className="h-4 w-4 text-success" />
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold">{val(data?.totalPacientes ?? 0)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Receita do Mês</CardTitle>
+            <DollarSign className="h-4 w-4 text-success" />
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold">{val(formatCurrency(data?.receitaMes ?? 0))}</p>
+            <p className="text-xs text-muted-foreground mt-1">Apenas particular</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Taxa de Comparecimento</CardTitle>
+            <TrendingUp className="h-4 w-4 text-warning" />
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold">{val(`${data?.taxaComparecimento ?? 0}%`)}</p>
+          </CardContent>
+        </Card>
       </div>
 
+      {/* Próximas Consultas */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Próximas Consultas</CardTitle>
@@ -111,12 +162,17 @@ function DashboardPage() {
                   <div>
                     <p className="font-medium text-sm">{a.paciente?.nome}</p>
                     <p className="text-xs text-muted-foreground">
-                      {a.service?.nome} · {a.professional?.nome} · {a.data} {a.horaInicio}
+                      {a.service?.nome} · {a.professional?.nome} · {new Date(a.data + "T00:00:00").toLocaleDateString("pt-BR")} {a.horaInicio}
                     </p>
                   </div>
-                  <span className={`text-xs capitalize font-medium ${statusColors[a.status] ?? "text-muted-foreground"}`}>
-                    {a.status.replace("_", " ")}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground capitalize">
+                      {a.tipoAtendimento === "convenio" ? "Convênio" : "Particular"}
+                    </span>
+                    <span className={`text-xs capitalize font-medium ${statusColors[a.status] ?? "text-muted-foreground"}`}>
+                      {a.status.replace("_", " ")}
+                    </span>
+                  </div>
                 </div>
               ))}
             </div>

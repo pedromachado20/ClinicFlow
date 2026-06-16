@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/start";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Plus, TrendingUp, TrendingDown, DollarSign, Printer } from "lucide-react";
+import { Plus, TrendingUp, TrendingDown, DollarSign, Printer, Sun } from "lucide-react";
 import { printTable } from "~/lib/pdf";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
@@ -23,21 +23,31 @@ const getFinanceiro = createServerFn({ method: "GET" }).handler(async () => {
   const { eq, and, gte, sql } = await import("drizzle-orm");
   const { transacoes } = await import("~/db/schema");
 
+  const hoje = new Date().toISOString().slice(0, 10);
   const inicioMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
 
-  const [receitas, despesas, lista] = await Promise.all([
+  const [receitas, despesas, receitaHoje, despesaHoje, lista] = await Promise.all([
     db.select({ total: sql<string>`coalesce(sum(valor), 0)` }).from(transacoes).where(and(eq(transacoes.tenantId, tenantId), eq(transacoes.tipo, "receita"), gte(transacoes.data, inicioMes))),
     db.select({ total: sql<string>`coalesce(sum(valor), 0)` }).from(transacoes).where(and(eq(transacoes.tenantId, tenantId), eq(transacoes.tipo, "despesa"), gte(transacoes.data, inicioMes))),
+    db.select({ total: sql<string>`coalesce(sum(valor), 0)` }).from(transacoes).where(and(eq(transacoes.tenantId, tenantId), eq(transacoes.tipo, "receita"), eq(transacoes.data, hoje))),
+    db.select({ total: sql<string>`coalesce(sum(valor), 0)` }).from(transacoes).where(and(eq(transacoes.tenantId, tenantId), eq(transacoes.tipo, "despesa"), eq(transacoes.data, hoje))),
     db.query.transacoes.findMany({
       where: and(eq(transacoes.tenantId, tenantId), gte(transacoes.data, inicioMes)),
-      orderBy: (t, { desc }) => [desc(t.data)],
+      orderBy: (t, { desc }) => [desc(t.data), desc(t.createdAt)],
       limit: 50,
     }),
   ]);
 
   const totalReceitas = parseFloat(receitas[0]?.total ?? "0");
   const totalDespesas = parseFloat(despesas[0]?.total ?? "0");
-  return { totalReceitas, totalDespesas, saldo: totalReceitas - totalDespesas, transacoes: lista };
+  return {
+    totalReceitas,
+    totalDespesas,
+    saldo: totalReceitas - totalDespesas,
+    receitaHoje: parseFloat(receitaHoje[0]?.total ?? "0"),
+    despesaHoje: parseFloat(despesaHoje[0]?.total ?? "0"),
+    transacoes: lista,
+  };
 });
 
 const criarTransacao = createServerFn({ method: "POST" })
@@ -64,7 +74,7 @@ const schema = z.object({
   data: z.string(),
 });
 
-const categoriasReceita = ["Consultas", "Procedimentos", "Exames", "Planos/Convênios", "Outros"];
+const categoriasReceita = ["Consultas Particular", "Consultas Convênio", "Procedimentos", "Exames", "Repasse de Plano", "Outros"];
 const categoriasDespesa = ["Salários", "Aluguel", "Equipamentos", "Materiais", "Marketing", "Outros"];
 
 export const Route = createFileRoute("/_app/financeiro/")({
@@ -96,36 +106,64 @@ function FinanceiroPage() {
     onError: () => toast.error("Erro ao salvar"),
   });
 
+  const val = (v: string) => isLoading ? "..." : v;
+
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 grid-cols-3">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm text-muted-foreground">Receitas do Mês</CardTitle>
-            <TrendingUp className="h-4 w-4 text-success" />
-          </CardHeader>
-          <CardContent><p className="text-2xl font-bold text-success">{formatCurrency(data?.totalReceitas ?? 0)}</p></CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm text-muted-foreground">Despesas do Mês</CardTitle>
-            <TrendingDown className="h-4 w-4 text-destructive" />
-          </CardHeader>
-          <CardContent><p className="text-2xl font-bold text-destructive">{formatCurrency(data?.totalDespesas ?? 0)}</p></CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm text-muted-foreground">Saldo</CardTitle>
-            <DollarSign className="h-4 w-4 text-primary" />
-          </CardHeader>
-          <CardContent>
-            <p className={`text-2xl font-bold ${(data?.saldo ?? 0) >= 0 ? "text-success" : "text-destructive"}`}>
-              {formatCurrency(data?.saldo ?? 0)}
-            </p>
-          </CardContent>
-        </Card>
+      {/* Cards do Mês */}
+      <div>
+        <p className="text-xs text-muted-foreground mb-3 font-medium uppercase tracking-wide">Resumo do Mês</p>
+        <div className="grid gap-4 grid-cols-3">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm text-muted-foreground">Receitas do Mês</CardTitle>
+              <TrendingUp className="h-4 w-4 text-success" />
+            </CardHeader>
+            <CardContent><p className="text-2xl font-bold text-success">{val(formatCurrency(data?.totalReceitas ?? 0))}</p></CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm text-muted-foreground">Despesas do Mês</CardTitle>
+              <TrendingDown className="h-4 w-4 text-destructive" />
+            </CardHeader>
+            <CardContent><p className="text-2xl font-bold text-destructive">{val(formatCurrency(data?.totalDespesas ?? 0))}</p></CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm text-muted-foreground">Saldo do Mês</CardTitle>
+              <DollarSign className="h-4 w-4 text-primary" />
+            </CardHeader>
+            <CardContent>
+              <p className={`text-2xl font-bold ${(data?.saldo ?? 0) >= 0 ? "text-success" : "text-destructive"}`}>
+                {val(formatCurrency(data?.saldo ?? 0))}
+              </p>
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
+      {/* Cards do Dia */}
+      <div>
+        <p className="text-xs text-muted-foreground mb-3 font-medium uppercase tracking-wide">Resumo de Hoje</p>
+        <div className="grid gap-4 grid-cols-2">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm text-muted-foreground">Receita do Dia</CardTitle>
+              <Sun className="h-4 w-4 text-success" />
+            </CardHeader>
+            <CardContent><p className="text-2xl font-bold text-success">{val(formatCurrency(data?.receitaHoje ?? 0))}</p></CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm text-muted-foreground">Despesa do Dia</CardTitle>
+              <Sun className="h-4 w-4 text-destructive" />
+            </CardHeader>
+            <CardContent><p className="text-2xl font-bold text-destructive">{val(formatCurrency(data?.despesaHoje ?? 0))}</p></CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* Lista de lançamentos */}
       <div className="flex items-center justify-between">
         <h3 className="font-semibold">Lançamentos do Mês</h3>
         <div className="flex gap-2">
@@ -202,7 +240,9 @@ function FinanceiroPage() {
               <CardContent className="flex items-center justify-between py-3 px-4">
                 <div>
                   <p className="font-medium text-sm">{t.descricao}</p>
-                  <p className="text-xs text-muted-foreground">{t.categoria} · {t.data}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {t.categoria} · {new Date(t.data + "T00:00:00").toLocaleDateString("pt-BR")}
+                  </p>
                 </div>
                 <p className={`font-bold ${t.tipo === "receita" ? "text-success" : "text-destructive"}`}>
                   {t.tipo === "receita" ? "+" : "-"}{formatCurrency(t.valor)}
