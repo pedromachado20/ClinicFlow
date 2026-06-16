@@ -1,8 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/start";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useRef } from "react";
-import { Plus, Phone, Mail, Pencil, Trash2, Printer, Search, Camera, X } from "lucide-react";
+import { Plus, Phone, Mail, Pencil, Trash2, Printer, Search, Camera, X, FileText } from "lucide-react";
 import { z } from "zod";
 import { Card, CardContent } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
@@ -348,11 +348,20 @@ function PacientesPage() {
                   <Badge variant="outline" className="text-xs">{p.convenio}</Badge>
                 )}
                 <div className="flex gap-1 pt-1 border-t border-border">
-                  <Button variant="ghost" size="sm" className="flex-1 h-7 text-xs" onClick={() => abrirEditar(p)}>
-                    <Pencil className="h-3.5 w-3.5" /> Editar
+                  <Link
+                    to="/prontuarios"
+                    search={{ pacienteId: p.id }}
+                    className="flex-1"
+                  >
+                    <Button variant="ghost" size="sm" className="w-full h-7 text-xs text-primary hover:text-primary">
+                      <FileText className="h-3.5 w-3.5" /> Prontuário
+                    </Button>
+                  </Link>
+                  <Button variant="ghost" size="sm" className="h-7 text-xs px-2" onClick={() => abrirEditar(p)}>
+                    <Pencil className="h-3.5 w-3.5" />
                   </Button>
-                  <Button variant="ghost" size="sm" className="flex-1 h-7 text-xs text-destructive hover:text-destructive" onClick={() => setExcluindo(p.id)}>
-                    <Trash2 className="h-3.5 w-3.5" /> Excluir
+                  <Button variant="ghost" size="sm" className="h-7 text-xs px-2 text-destructive hover:text-destructive" onClick={() => setExcluindo(p.id)}>
+                    <Trash2 className="h-3.5 w-3.5" />
                   </Button>
                 </div>
               </CardContent>

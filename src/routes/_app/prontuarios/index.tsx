@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/start";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { z } from "zod";
 import { Plus, Search, FileText, Pill, Award, Printer } from "lucide-react";
 import { z } from "zod";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
@@ -124,13 +125,15 @@ const salvarAtestado = createServerFn({ method: "POST" })
 type Medicamento = { nome: string; dosagem: string; via: string; posologia: string; duracao: string; quantidade: string };
 
 export const Route = createFileRoute("/_app/prontuarios/")({
+  validateSearch: z.object({ pacienteId: z.string().optional() }),
   component: ProntuariosPage,
 });
 
 function ProntuariosPage() {
   const qc = useQueryClient();
+  const { pacienteId: pacienteIdParam } = Route.useSearch();
   const [busca, setBusca] = useState("");
-  const [pacienteSel, setPacienteSel] = useState<string | null>(null);
+  const [pacienteSel, setPacienteSel] = useState<string | null>(pacienteIdParam ?? null);
 
   const { data: pageData } = useQuery({ queryKey: ["prontuarios-page"], queryFn: () => getProntuariosData() });
   const { data: pacData, refetch: refetchPac } = useQuery({
