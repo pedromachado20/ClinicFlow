@@ -177,13 +177,25 @@ function PacientesPage() {
         observacoes: fObs || undefined, fotoUrl: fFoto || undefined,
       },
     }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["pacientes"] }); toast.success(editando ? "Paciente atualizado" : "Paciente cadastrado"); setOpen(false); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["pacientes"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      qc.invalidateQueries({ queryKey: ["relatorios"] });
+      toast.success(editando ? "Paciente atualizado" : "Paciente cadastrado");
+      setOpen(false);
+    },
     onError: () => toast.error("Erro ao salvar"),
   });
 
   const excluir = useMutation({
     mutationFn: (id: string) => excluirPaciente({ data: { id } }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["pacientes"] }); toast.success("Paciente removido"); setExcluindo(null); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["pacientes"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      qc.invalidateQueries({ queryKey: ["relatorios"] });
+      toast.success("Paciente removido");
+      setExcluindo(null);
+    },
     onError: () => toast.error("Erro ao remover"),
   });
 

@@ -173,13 +173,25 @@ function ProfissionaisPage() {
         fotoUrl: fFoto || undefined,
       },
     }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["profissionais"] }); toast.success(editando ? "Atualizado" : "Cadastrado"); setOpen(false); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["profissionais"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      qc.invalidateQueries({ queryKey: ["relatorios"] });
+      toast.success(editando ? "Atualizado" : "Cadastrado");
+      setOpen(false);
+    },
     onError: () => toast.error("Erro ao salvar"),
   });
 
   const excluir = useMutation({
     mutationFn: (id: string) => excluirProfissional({ data: { id } }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["profissionais"] }); toast.success("Removido"); setExcluindo(null); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["profissionais"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      qc.invalidateQueries({ queryKey: ["relatorios"] });
+      toast.success("Removido");
+      setExcluindo(null);
+    },
     onError: () => toast.error("Erro ao remover"),
   });
 
