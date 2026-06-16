@@ -24,10 +24,8 @@ export default defineConfig({
   },
   server: {
     preset: "vercel",
-    nitro: {
-      externals: {
-        inline: ["better-auth", "@better-auth/utils"],
-      },
+    externals: {
+      inline: ["better-auth", "@better-auth/utils"],
     },
   },
   vite: {
