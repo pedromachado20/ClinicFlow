@@ -65,7 +65,6 @@ function DashboardPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["dashboard"],
     queryFn: () => getDashboardData(),
-    refetchOnMount: "always",
   });
 
   const kpis = [
@@ -103,7 +102,7 @@ function DashboardPage() {
         <CardContent>
           {isLoading ? (
             <p className="text-sm text-muted-foreground">Carregando...</p>
-          ) : !data?.proximasConsultas.length ? (
+          ) : !data?.proximasConsultas?.length ? (
             <p className="text-sm text-muted-foreground">Nenhuma consulta agendada</p>
           ) : (
             <div className="space-y-3">

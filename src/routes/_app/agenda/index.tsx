@@ -235,7 +235,7 @@ function AgendaPage() {
           <Button variant="ghost" size="sm" onClick={() => setDataAtual(new Date().toISOString().slice(0, 10))}>Hoje</Button>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={handlePrint} disabled={!data?.agendamentos.length}>
+          <Button variant="outline" size="sm" onClick={handlePrint} disabled={!data?.agendamentos?.length}>
             <Printer className="h-4 w-4" /> PDF
           </Button>
           <Button size="sm" onClick={abrirNovo}><Plus className="h-4 w-4" /> Agendar</Button>
@@ -257,7 +257,7 @@ function AgendaPage() {
               <Label>Paciente *</Label>
               <Select value={pacSel} onValueChange={setPacSel}>
                 <SelectTrigger><SelectValue placeholder="Selecione o paciente" /></SelectTrigger>
-                <SelectContent>{data?.pacientes.map((p) => <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>)}</SelectContent>
+                <SelectContent>{data?.pacientes?.map((p) => <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -265,14 +265,14 @@ function AgendaPage() {
                 <Label>Profissional *</Label>
                 <Select value={proSel} onValueChange={setProSel}>
                   <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                  <SelectContent>{data?.profissionais.map((p) => <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>)}</SelectContent>
+                  <SelectContent>{data?.profissionais?.map((p) => <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
               <div className="space-y-1.5">
                 <Label>Serviço *</Label>
                 <Select value={svcSel} onValueChange={setSvcSel}>
                   <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                  <SelectContent>{data?.servicos.map((s) => <SelectItem key={s.id} value={s.id}>{s.nome} — {formatCurrency(s.preco)}</SelectItem>)}</SelectContent>
+                  <SelectContent>{data?.servicos?.map((s) => <SelectItem key={s.id} value={s.id}>{s.nome} — {formatCurrency(s.preco)}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
             </div>
@@ -382,7 +382,7 @@ function AgendaPage() {
 
       {isLoading ? (
         <p className="text-sm text-muted-foreground">Carregando...</p>
-      ) : !data?.agendamentos.length ? (
+      ) : !data?.agendamentos?.length ? (
         <Card><CardContent className="py-12 text-center text-muted-foreground">Nenhum agendamento para este dia</CardContent></Card>
       ) : (
         <div className="space-y-3">

@@ -129,7 +129,7 @@ function FinanceiroPage() {
       <div className="flex items-center justify-between">
         <h3 className="font-semibold">Lançamentos do Mês</h3>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" disabled={!data?.transacoes.length} onClick={() =>
+          <Button variant="outline" size="sm" disabled={!data?.transacoes?.length} onClick={() =>
             printTable("Financeiro — Lançamentos do Mês", ["Data", "Tipo", "Categoria", "Descrição", "Valor"],
               (data?.transacoes ?? []).map((t) => [
                 new Date(t.data + "T00:00:00").toLocaleDateString("pt-BR"),
@@ -193,7 +193,7 @@ function FinanceiroPage() {
 
       {isLoading ? (
         <p className="text-sm text-muted-foreground">Carregando...</p>
-      ) : !data?.transacoes.length ? (
+      ) : !data?.transacoes?.length ? (
         <Card><CardContent className="py-12 text-center text-muted-foreground">Nenhum lançamento este mês</CardContent></Card>
       ) : (
         <div className="space-y-2">

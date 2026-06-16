@@ -61,7 +61,6 @@ function RelatoriosPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["relatorios"],
     queryFn: () => getRelatorios(),
-    refetchOnMount: "always",
   });
 
   const kpis = [
@@ -71,9 +70,9 @@ function RelatoriosPage() {
     { label: "Taxa de Comparecimento", value: `${data?.taxaComparecimento ?? 0}%`, icon: TrendingUp },
   ];
 
-  const maxTop = Math.max(...(data?.topServicos.map((s) => s.total) ?? [1]), 1);
-  const particular = data?.tipoAtendimento.find((t) => t.tipo === "particular")?.total ?? 0;
-  const convenio = data?.tipoAtendimento.find((t) => t.tipo === "convenio")?.total ?? 0;
+  const maxTop = Math.max(...(data?.topServicos?.map((s) => s.total) ?? [1]), 1);
+  const particular = data?.tipoAtendimento?.find((t) => t.tipo === "particular")?.total ?? 0;
+  const convenio = data?.tipoAtendimento?.find((t) => t.tipo === "convenio")?.total ?? 0;
   const totalTipo = particular + convenio || 1;
 
   return (
@@ -100,7 +99,7 @@ function RelatoriosPage() {
           <CardContent>
             {isLoading ? (
               <p className="text-sm text-muted-foreground">Carregando...</p>
-            ) : !data?.topServicos.length ? (
+            ) : !data?.topServicos?.length ? (
               <p className="text-sm text-muted-foreground">Sem consultas este mês</p>
             ) : (
               <div className="space-y-3">
