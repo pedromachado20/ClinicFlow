@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { Printer, BookOpen, ChevronRight } from "lucide-react";
 import { Button } from "~/components/ui/button";
 
@@ -19,49 +20,49 @@ type Secao = {
 // ─── Componentes de formatação ────────────────────────────────────────────────
 
 function H2({ children }: { children: React.ReactNode }) {
-  return <h2 className="text-xl font-bold text-foreground mt-6 mb-2 border-b border-border pb-2">{children}</h2>;
+  return <h2 data-type="h2" className="text-xl font-bold text-foreground mt-6 mb-2 border-b border-border pb-2">{children}</h2>;
 }
 function H3({ children }: { children: React.ReactNode }) {
-  return <h3 className="text-base font-semibold text-foreground mt-5 mb-1.5">{children}</h3>;
+  return <h3 data-type="h3" className="text-base font-semibold text-foreground mt-5 mb-1.5">{children}</h3>;
 }
 function P({ children }: { children: React.ReactNode }) {
-  return <p className="text-sm text-muted-foreground leading-relaxed mb-3">{children}</p>;
+  return <p data-type="p" className="text-sm text-muted-foreground leading-relaxed mb-3">{children}</p>;
 }
 function Passo({ n, children }: { n: number; children: React.ReactNode }) {
   return (
-    <div className="flex gap-3 mb-3">
-      <span className="flex-shrink-0 h-6 w-6 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center mt-0.5">{n}</span>
+    <div data-type="passo" className="flex gap-3 mb-3">
+      <span data-type="passo-n" className="flex-shrink-0 h-6 w-6 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center mt-0.5">{n}</span>
       <p className="text-sm text-foreground leading-relaxed">{children}</p>
     </div>
   );
 }
 function Dica({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-lg border border-green-500/30 bg-green-500/5 px-4 py-3 mb-3">
-      <p className="text-xs font-semibold text-green-600 uppercase tracking-wide mb-1">Dica</p>
+    <div data-type="dica" className="rounded-lg border border-green-500/30 bg-green-500/5 px-4 py-3 mb-3">
+      <p data-type="box-label-dica" className="text-xs font-semibold text-green-600 uppercase tracking-wide mb-1">Dica</p>
       <p className="text-sm text-foreground leading-relaxed">{children}</p>
     </div>
   );
 }
 function Atencao({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/5 px-4 py-3 mb-3">
-      <p className="text-xs font-semibold text-yellow-600 uppercase tracking-wide mb-1">Atenção</p>
+    <div data-type="atencao" className="rounded-lg border border-yellow-500/30 bg-yellow-500/5 px-4 py-3 mb-3">
+      <p data-type="box-label-atencao" className="text-xs font-semibold text-yellow-600 uppercase tracking-wide mb-1">Atenção</p>
       <p className="text-sm text-foreground leading-relaxed">{children}</p>
     </div>
   );
 }
 function Exemplo({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 mb-3">
-      <p className="text-xs font-semibold text-primary uppercase tracking-wide mb-1">Exemplo prático</p>
+    <div data-type="exemplo" className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 mb-3">
+      <p data-type="box-label-exemplo" className="text-xs font-semibold text-primary uppercase tracking-wide mb-1">Exemplo prático</p>
       <p className="text-sm text-foreground leading-relaxed">{children}</p>
     </div>
   );
 }
 function Lista({ itens }: { itens: string[] }) {
   return (
-    <ul className="space-y-1 mb-3 ml-4">
+    <ul data-type="lista" className="space-y-1 mb-3 ml-4">
       {itens.map((item, i) => (
         <li key={i} className="text-sm text-muted-foreground flex gap-2">
           <ChevronRight className="h-3.5 w-3.5 mt-0.5 shrink-0 text-primary" />
@@ -687,55 +688,70 @@ function imprimirManual() {
   if (!win) { alert("Pop-up bloqueado. Permita pop-ups para imprimir."); return; }
 
   const css = `
-    * { box-sizing: border-box; }
-    body { font-family: Arial, sans-serif; font-size: 11px; color: #111; margin: 0; padding: 0; }
-    .capa { page-break-after: always; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; text-align: center; background: #1a56db; color: white; }
-    .capa h1 { font-size: 36px; margin: 0 0 12px; }
-    .capa p { font-size: 14px; opacity: .8; }
-    .capitulo { padding: 40px 50px; page-break-before: always; max-width: 750px; margin: 0 auto; }
-    .cap-header { border-bottom: 3px solid #1a56db; padding-bottom: 10px; margin-bottom: 20px; }
-    .cap-header h2 { font-size: 22px; color: #1a56db; margin: 0; }
-    h3 { font-size: 14px; color: #111; margin: 18px 0 6px; }
-    p { font-size: 11px; line-height: 1.7; margin: 0 0 10px; color: #333; }
-    .passo { display: flex; gap: 10px; margin-bottom: 8px; }
-    .passo-n { flex-shrink: 0; width: 20px; height: 20px; border-radius: 50%; background: #1a56db; color: white; font-size: 9px; font-weight: bold; display: flex; align-items: center; justify-content: center; margin-top: 2px; }
-    .box { border-radius: 6px; padding: 10px 14px; margin: 10px 0; font-size: 10px; }
-    .box-dica { border: 1px solid #16a34a; background: #f0fdf4; }
-    .box-dica .label { font-weight: bold; color: #16a34a; font-size: 9px; text-transform: uppercase; margin-bottom: 4px; }
-    .box-atencao { border: 1px solid #d97706; background: #fffbeb; }
-    .box-atencao .label { font-weight: bold; color: #d97706; font-size: 9px; text-transform: uppercase; margin-bottom: 4px; }
-    .box-exemplo { border: 1px solid #1a56db; background: #eff6ff; }
-    .box-exemplo .label { font-weight: bold; color: #1a56db; font-size: 9px; text-transform: uppercase; margin-bottom: 4px; }
-    ul { margin: 0 0 10px 0; padding: 0; list-style: none; }
-    ul li { padding: 2px 0 2px 16px; position: relative; font-size: 11px; color: #333; }
-    ul li::before { content: "›"; position: absolute; left: 4px; color: #1a56db; font-weight: bold; }
-    @media print { body { padding: 0; } .capitulo { padding: 25px 35px; } }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; font-size: 11px; color: #111; }
+    .capa { page-break-after: always; display: flex; flex-direction: column; align-items: center;
+      justify-content: center; min-height: 100vh; text-align: center; background: #1e3a8a; color: white; padding: 40px; }
+    .capa h1 { font-size: 42px; margin: 0 0 10px; letter-spacing: -1px; }
+    .capa .subtitulo { font-size: 20px; font-weight: bold; margin-bottom: 6px; opacity: .95; }
+    .capa .desc { font-size: 13px; opacity: .7; }
+    .capa .data { margin-top: 30px; font-size: 10px; opacity: .5; }
+    .capitulo { padding: 36px 50px; page-break-before: always; max-width: 780px; margin: 0 auto; }
+    .cap-header { display: flex; align-items: center; gap: 12px; border-bottom: 3px solid #1e3a8a;
+      padding-bottom: 12px; margin-bottom: 22px; }
+    .cap-header h2 { font-size: 22px; color: #1e3a8a; }
+    [data-type="h2"] { font-size: 15px; font-weight: bold; color: #1e3a8a; border-bottom: 1px solid #c7d2fe;
+      padding-bottom: 5px; margin: 22px 0 10px; }
+    [data-type="h3"] { font-size: 12px; font-weight: bold; color: #111; margin: 16px 0 6px; }
+    [data-type="p"] { font-size: 11px; line-height: 1.75; margin-bottom: 9px; color: #333; }
+    [data-type="passo"] { display: flex; gap: 10px; margin-bottom: 8px; align-items: flex-start; }
+    [data-type="passo-n"] { flex-shrink: 0; width: 20px; height: 20px; border-radius: 50%;
+      background: #1e3a8a; color: white; font-size: 9px; font-weight: bold; text-align: center;
+      line-height: 20px; display: inline-block; }
+    [data-type="passo"] p { font-size: 11px; line-height: 1.7; color: #222; margin: 0; padding-top: 1px; }
+    [data-type="dica"] { border: 1px solid #16a34a; background: #f0fdf4; border-radius: 6px;
+      padding: 10px 14px; margin: 10px 0; }
+    [data-type="box-label-dica"] { font-size: 9px; font-weight: bold; color: #15803d;
+      text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
+    [data-type="atencao"] { border: 1px solid #d97706; background: #fffbeb; border-radius: 6px;
+      padding: 10px 14px; margin: 10px 0; }
+    [data-type="box-label-atencao"] { font-size: 9px; font-weight: bold; color: #b45309;
+      text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
+    [data-type="exemplo"] { border: 1px solid #6366f1; background: #eef2ff; border-radius: 6px;
+      padding: 10px 14px; margin: 10px 0; }
+    [data-type="box-label-exemplo"] { font-size: 9px; font-weight: bold; color: #4f46e5;
+      text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
+    [data-type="dica"] p, [data-type="atencao"] p, [data-type="exemplo"] p { font-size: 11px; line-height: 1.7; color: #222; margin: 0; }
+    [data-type="lista"] { margin: 4px 0 10px 4px; padding: 0; list-style: none; }
+    [data-type="lista"] li { display: flex; gap: 8px; padding: 2px 0; font-size: 11px; color: #333; line-height: 1.6; }
+    [data-type="lista"] li svg { display: none; }
+    [data-type="lista"] li::before { content: "›"; color: #1e3a8a; font-weight: bold; font-size: 13px; flex-shrink: 0; }
+    strong { font-weight: bold; }
+    em { font-style: italic; }
+    @media print { .capitulo { padding: 20px 35px; } }
   `;
 
-  const renderSecao = (s: Secao) => {
-    // Simple text extraction for print — render section titles only with placeholder
+  const capitulosHtml = secoes.map((s) => {
+    const conteudoHtml = renderToStaticMarkup(<>{s.conteudo}</>);
     return `
       <div class="capitulo">
         <div class="cap-header"><h2>${s.emoji} ${s.titulo}</h2></div>
-        <p><em>Consulte esta seção no sistema ClinicFlow → Manual / Ajuda → ${s.titulo}</em></p>
+        ${conteudoHtml}
       </div>`;
-  };
+  }).join("");
 
-  // Build full HTML using static content
-  const capitulosHtml = secoes.map((s) => renderSecao(s)).join("");
-
-  win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Manual ClinicFlow</title>
-    <style>${css}</style></head><body>
+  win.document.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8">
+    <title>Manual ClinicFlow</title><style>${css}</style></head><body>
     <div class="capa">
       <h1>ClinicFlow</h1>
-      <p style="font-size:20px;font-weight:bold;margin-bottom:8px">Manual do Usuário</p>
-      <p>Guia completo de treinamento</p>
-      <p style="margin-top:20px;font-size:10px;opacity:.6">Gerado em ${new Date().toLocaleString("pt-BR")}</p>
+      <p class="subtitulo">Manual do Usuário</p>
+      <p class="desc">Guia completo de treinamento para toda a equipe</p>
+      <p class="data">Gerado em ${new Date().toLocaleString("pt-BR")}</p>
     </div>
     ${capitulosHtml}
   </body></html>`);
   win.document.close();
-  setTimeout(() => win.print(), 500);
+  setTimeout(() => win.print(), 600);
 }
 
 // ─── Página ────────────────────────────────────────────────────────────────────
