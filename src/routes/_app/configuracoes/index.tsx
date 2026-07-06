@@ -18,9 +18,10 @@ import { toast } from "sonner";
 import { requireAdminRoute } from "~/lib/utils";
 
 const getConfig = createServerFn({ method: "GET" }).handler(async () => {
-  const { requireTenant } = await import("~/server/context");
+  const { requireTenant, requireRole, ADMIN_ROLES } = await import("~/server/context");
   const { db } = await import("~/db");
-  const { tenantId } = await requireTenant();
+  const { tenantId, userRole } = await requireTenant();
+  requireRole(userRole, ADMIN_ROLES);
   const { eq } = await import("drizzle-orm");
   const { tenants } = await import("~/db/schema");
   return db.query.tenants.findFirst({ where: eq(tenants.id, tenantId) });
@@ -178,6 +179,7 @@ const redefinirSenhaMembro = createServerFn({ method: "POST" })
 
     const alvo = await db.query.users.findFirst({ where: and(eq(users.id, data.userId), eq(users.tenantId, tenantId)) });
     if (!alvo) throw new Error("Usuário não encontrado");
+    if (alvo.role === "owner" && userRole !== "owner") throw new Error("Apenas o dono pode redefinir a própria senha");
 
     const hash = await hashPassword(data.novaSenha);
     await db.update(accounts)
@@ -194,6 +196,9 @@ const alterarRoleMembro = createServerFn({ method: "POST" })
     const { db } = await import("~/db");
     const { eq, and } = await import("drizzle-orm");
     const { users } = await import("~/db/schema");
+    const alvo = await db.query.users.findFirst({ where: and(eq(users.id, data.userId), eq(users.tenantId, tenantId)) });
+    if (!alvo) throw new Error("Usuário não encontrado");
+    if (alvo.role === "owner") throw new Error("Não é possível alterar o papel do dono");
     await db.update(users).set({ role: data.role, updatedAt: new Date() })
       .where(and(eq(users.id, data.userId), eq(users.tenantId, tenantId)));
   });
@@ -208,6 +213,9 @@ const alterarAtivoMembro = createServerFn({ method: "POST" })
     const { db } = await import("~/db");
     const { eq, and } = await import("drizzle-orm");
     const { users } = await import("~/db/schema");
+    const alvo = await db.query.users.findFirst({ where: and(eq(users.id, data.userId), eq(users.tenantId, tenantId)) });
+    if (!alvo) throw new Error("Usuário não encontrado");
+    if (alvo.role === "owner") throw new Error("Não é possível desativar o dono");
     await db.update(users).set({ ativo: data.ativo, updatedAt: new Date() })
       .where(and(eq(users.id, data.userId), eq(users.tenantId, tenantId)));
   });

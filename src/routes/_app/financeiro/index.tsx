@@ -17,9 +17,10 @@ import { toast } from "sonner";
 import { formatCurrency, requireAdminRoute } from "~/lib/utils";
 
 const getFinanceiro = createServerFn({ method: "GET" }).handler(async () => {
-  const { requireTenant } = await import("~/server/context");
+  const { requireTenant, requireRole, ADMIN_ROLES } = await import("~/server/context");
   const { db } = await import("~/db");
-  const { tenantId } = await requireTenant();
+  const { tenantId, userRole } = await requireTenant();
+  requireRole(userRole, ADMIN_ROLES);
   const { eq, and, gte, sql, desc } = await import("drizzle-orm");
   const { transacoes, tenants } = await import("~/db/schema");
 
