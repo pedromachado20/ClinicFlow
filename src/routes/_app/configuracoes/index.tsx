@@ -358,8 +358,9 @@ function ConfiguracoesPage() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label>CNPJ</Label>
-                <Input {...register("cnpj")} placeholder="00.000.000/0000-00" />
+                <Label>CPF ou CNPJ</Label>
+                <Input {...register("cnpj")} placeholder="000.000.000-00 ou 00.000.000/0000-00" />
+                <p className="text-xs text-muted-foreground">Necessário para assinar o plano (cobrança no Asaas).</p>
               </div>
               <div className="space-y-1.5">
                 <Label>CNES</Label>

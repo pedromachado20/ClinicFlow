@@ -263,8 +263,9 @@ function OnboardingPage() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label>CNPJ</Label>
-                <Input placeholder="00.000.000/0000-00" value={form.cnpj} onChange={(e) => updateForm("cnpj", e.target.value)} />
+                <Label>CPF ou CNPJ</Label>
+                <Input placeholder="000.000.000-00 ou 00.000.000/0000-00" value={form.cnpj} onChange={(e) => updateForm("cnpj", e.target.value)} />
+                <p className="text-xs text-muted-foreground">Necessário para assinar o plano depois do trial. Pode preencher depois em Configurações.</p>
               </div>
               <div className="space-y-1.5">
                 <Label>CNES</Label>

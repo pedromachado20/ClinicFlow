@@ -2,10 +2,11 @@ import { createFileRoute, useRouteContext } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/start";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { CreditCard, CheckCircle2, Clock } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "~/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
 import { toast } from "sonner";
+import { formatCurrency } from "~/lib/utils";
 import type { UserRole } from "~/server/context";
 
 const getAssinatura = createServerFn({ method: "GET" }).handler(async () => {
@@ -91,13 +92,40 @@ function AssinaturaPage() {
 
   return (
     <div className="max-w-xl space-y-6">
+      <div>
+        <h1 className="text-xl font-bold">Assinatura</h1>
+        <p className="text-sm text-muted-foreground mt-1">Acompanhe o status do seu plano e a cobrança do ClinicFlow.</p>
+      </div>
+
+      <div className="rounded-xl border border-warning/30 bg-warning/5 p-5 space-y-3">
+        <p className="font-semibold">Plano ClinicFlow</p>
+        <ul className="space-y-2 text-sm">
+          <li className="flex items-start gap-2">
+            <CheckCircle2 className="h-4 w-4 text-success shrink-0 mt-0.5" />
+            <span>7 dias de teste grátis, sem cartão de crédito</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <CheckCircle2 className="h-4 w-4 text-success shrink-0 mt-0.5" />
+            <span>Depois, apenas <strong>{formatCurrency(data?.preco ?? 0)}</strong> por mês</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <CheckCircle2 className="h-4 w-4 text-success shrink-0 mt-0.5" />
+            <span>Acesso completo: Agenda, Pacientes, Prontuários, Financeiro, Caixa e Relatórios</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <CheckCircle2 className="h-4 w-4 text-success shrink-0 mt-0.5" />
+            <span>Sem fidelidade — seus dados continuam guardados mesmo se a assinatura ficar em atraso</span>
+          </li>
+        </ul>
+      </div>
+
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <div>
+          <div className="flex items-center gap-2">
+            <CreditCard className="h-4 w-4" />
             <CardTitle className="text-base">Assinatura</CardTitle>
-            <CardDescription className="mt-1">Status do plano do ClinicFlow para {data?.nome}</CardDescription>
           </div>
-          {data?.status === "ativo" && <Badge variant="success">Ativo</Badge>}
+          {data?.status === "ativo" && <Badge variant="success">Assinatura ativa</Badge>}
           {data?.status === "trial" && <Badge variant="secondary">Trial</Badge>}
           {data?.status === "suspenso" && <Badge variant="destructive">Suspenso</Badge>}
         </CardHeader>
@@ -120,19 +148,6 @@ function AssinaturaPage() {
               <p className="text-sm">Assinatura criada. Acompanhe o pagamento pelo link enviado pelo Asaas.</p>
             </div>
           )}
-
-          <div className="rounded-lg border border-border p-4 space-y-2">
-            <p className="text-sm font-medium">Plano Mensal</p>
-            <p className="text-2xl font-bold">
-              {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(data?.preco ?? 0)}
-              <span className="text-sm font-normal text-muted-foreground">/mês</span>
-            </p>
-            <ul className="text-sm text-muted-foreground space-y-1 mt-2">
-              <li>• Agenda, prontuários, financeiro e caixa ilimitados</li>
-              <li>• Integração com WhatsApp</li>
-              <li>• Suporte por e-mail</li>
-            </ul>
-          </div>
 
           {!data?.asaasSubscriptionId && isAdmin && (
             <Button className="w-full" disabled={assinarMut.isPending} onClick={() => assinarMut.mutate()}>
