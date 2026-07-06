@@ -22,6 +22,13 @@
       "when": 1783362351798,
       "tag": "0002_hot_giant_girl",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1783374823063,
+      "tag": "0003_bumpy_invaders",
+      "breakpoints": true
     }
   ]
 }

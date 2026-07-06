@@ -37,6 +37,9 @@ export default defineConfig({
       "process.env.ASAAS_BASE_URL": JSON.stringify(getEnv("ASAAS_BASE_URL")),
       "process.env.ASAAS_WEBHOOK_TOKEN": JSON.stringify(getEnv("ASAAS_WEBHOOK_TOKEN")),
       "process.env.SUBSCRIPTION_PRICE_OVERRIDE": JSON.stringify(getEnv("SUBSCRIPTION_PRICE_OVERRIDE")),
+      "process.env.RESEND_API_KEY": JSON.stringify(getEnv("RESEND_API_KEY")),
+      "process.env.EMAIL_FROM": JSON.stringify(getEnv("EMAIL_FROM")),
+      "process.env.CRON_SECRET": JSON.stringify(getEnv("CRON_SECRET")),
     },
     plugins: [
       tailwindcss(),

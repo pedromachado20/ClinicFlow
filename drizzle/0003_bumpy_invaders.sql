@@ -1,0 +1,1 @@
+ALTER TABLE "tenants" ADD COLUMN "trial_reminder_sent_at" timestamp with time zone;

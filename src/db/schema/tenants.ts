@@ -39,6 +39,7 @@ export const tenants = pgTable("tenants", {
   // Cobrança (Asaas)
   asaasCustomerId: text("asaas_customer_id"),
   asaasSubscriptionId: text("asaas_subscription_id"),
+  trialReminderSentAt: timestamp("trial_reminder_sent_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
