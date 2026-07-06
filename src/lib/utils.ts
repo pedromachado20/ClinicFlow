@@ -1,8 +1,18 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { redirect } from "@tanstack/react-router";
+import type { UserRole } from "~/server/context";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
+}
+
+const ADMIN_ROLES: UserRole[] = ["owner", "admin"];
+
+export function requireAdminRoute({ context }: { context: { userRole?: UserRole } }) {
+  if (context.userRole && !ADMIN_ROLES.includes(context.userRole)) {
+    throw redirect({ to: "/dashboard" });
+  }
 }
 
 export function formatCurrency(value: number | string) {

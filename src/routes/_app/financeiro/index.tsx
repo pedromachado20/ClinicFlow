@@ -14,7 +14,7 @@ import { Label } from "~/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "~/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
 import { toast } from "sonner";
-import { formatCurrency } from "~/lib/utils";
+import { formatCurrency, requireAdminRoute } from "~/lib/utils";
 
 const getFinanceiro = createServerFn({ method: "GET" }).handler(async () => {
   const { requireTenant } = await import("~/server/context");
@@ -70,9 +70,10 @@ const criarTransacao = createServerFn({ method: "POST" })
     data: z.string(),
   }))
   .handler(async ({ data }) => {
-    const { requireTenant } = await import("~/server/context");
+    const { requireTenant, requireRole, ADMIN_ROLES } = await import("~/server/context");
     const { db } = await import("~/db");
-    const { tenantId } = await requireTenant();
+    const { tenantId, userRole } = await requireTenant();
+    requireRole(userRole, ADMIN_ROLES);
     const { transacoes } = await import("~/db/schema");
     await db.insert(transacoes).values({ id: crypto.randomUUID(), tenantId, ...data, pago: true, status: "pago" });
   });
@@ -89,6 +90,7 @@ const categoriasReceita = ["Consultas Particular", "Consultas Convênio", "Proce
 const categoriasDespesa = ["Salários", "Aluguel", "Equipamentos", "Materiais", "Marketing", "Outros"];
 
 export const Route = createFileRoute("/_app/financeiro/")({
+  beforeLoad: requireAdminRoute,
   component: FinanceiroPage,
 });
 

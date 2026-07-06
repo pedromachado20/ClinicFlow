@@ -1,13 +1,24 @@
 import { useState } from "react";
-import { Link, useRouterState } from "@tanstack/react-router";
+import { Link, useRouterState, useRouteContext } from "@tanstack/react-router";
 import {
   LayoutDashboard, CalendarDays, Users, UserCheck,
   Stethoscope, DollarSign, BarChart3, Settings, ChevronLeft,
-  ChevronRight, Receipt, ClipboardList, BookOpen,
+  ChevronRight, Receipt, ClipboardList, BookOpen, CreditCard,
+  type LucideIcon,
 } from "lucide-react";
 import { cn } from "~/lib/utils";
+import type { UserRole } from "~/server/context";
 
-const navItems = [
+const ADMIN_ROLES: UserRole[] = ["owner", "admin"];
+
+interface NavItem {
+  icon: LucideIcon;
+  label: string;
+  to: string;
+  roles?: UserRole[];
+}
+
+const navItems: { label: string; items: NavItem[] }[] = [
   {
     label: "Principal",
     items: [
@@ -26,16 +37,17 @@ const navItems = [
   {
     label: "Cadastros",
     items: [
-      { icon: UserCheck,   label: "Profissionais", to: "/profissionais" },
-      { icon: Stethoscope, label: "Serviços",      to: "/servicos" },
+      { icon: UserCheck,   label: "Profissionais", to: "/profissionais", roles: ADMIN_ROLES },
+      { icon: Stethoscope, label: "Serviços",      to: "/servicos", roles: ADMIN_ROLES },
     ],
   },
   {
     label: "Gestão",
     items: [
-      { icon: DollarSign, label: "Financeiro",    to: "/financeiro" },
-      { icon: BarChart3,  label: "Relatórios",    to: "/relatorios" },
-      { icon: Settings,   label: "Configurações", to: "/configuracoes" },
+      { icon: DollarSign, label: "Financeiro",    to: "/financeiro", roles: ADMIN_ROLES },
+      { icon: BarChart3,  label: "Relatórios",    to: "/relatorios", roles: ADMIN_ROLES },
+      { icon: Settings,   label: "Configurações", to: "/configuracoes", roles: ADMIN_ROLES },
+      { icon: CreditCard, label: "Assinatura",    to: "/assinatura", roles: ADMIN_ROLES },
     ],
   },
   {
@@ -50,6 +62,14 @@ export function AppSidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const router = useRouterState();
   const pathname = router.location.pathname;
+  const { userRole } = useRouteContext({ from: "/_app" }) as { userRole?: UserRole };
+
+  const visibleGroups = navItems
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => !item.roles || (userRole && item.roles.includes(userRole))),
+    }))
+    .filter((group) => group.items.length > 0);
 
   return (
     <aside className={cn("relative flex flex-col border-r border-border bg-card transition-all duration-300", collapsed ? "w-16" : "w-56")}>
@@ -59,7 +79,7 @@ export function AppSidebar() {
       </div>
 
       <nav className="flex-1 overflow-y-auto py-3">
-        {navItems.map((group) => (
+        {visibleGroups.map((group) => (
           <div key={group.label} className="mb-2">
             {!collapsed && (
               <p className="px-4 py-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">

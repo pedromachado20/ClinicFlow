@@ -4,13 +4,14 @@ import { useQuery } from "@tanstack/react-query";
 import { BarChart3, TrendingUp, Users, CalendarDays, Sun, Activity, Stethoscope, Printer } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
-import { formatCurrency } from "~/lib/utils";
+import { formatCurrency, requireAdminRoute } from "~/lib/utils";
 import { printRelatorio } from "~/lib/pdf";
 
 const getRelatorios = createServerFn({ method: "GET" }).handler(async () => {
-  const { requireTenant } = await import("~/server/context");
+  const { requireTenant, requireRole, ADMIN_ROLES } = await import("~/server/context");
   const { db } = await import("~/db");
-  const { tenantId } = await requireTenant();
+  const { tenantId, userRole } = await requireTenant();
+  requireRole(userRole, ADMIN_ROLES);
   const { eq, and, gte, sql } = await import("drizzle-orm");
   const { appointments, patients, transacoes, services, tenants } = await import("~/db/schema");
 
@@ -116,6 +117,7 @@ const getRelatorios = createServerFn({ method: "GET" }).handler(async () => {
 });
 
 export const Route = createFileRoute("/_app/relatorios/")({
+  beforeLoad: requireAdminRoute,
   component: RelatoriosPage,
 });
 

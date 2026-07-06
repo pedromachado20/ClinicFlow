@@ -12,8 +12,10 @@ import { Label } from "~/components/ui/label";
 import { Switch } from "~/components/ui/switch";
 import { Badge } from "~/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
-import { Wifi, BookOpen, ExternalLink, CheckCircle2 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "~/components/ui/dialog";
+import { Wifi, BookOpen, ExternalLink, CheckCircle2, UserPlus, KeyRound } from "lucide-react";
 import { toast } from "sonner";
+import { requireAdminRoute } from "~/lib/utils";
 
 const getConfig = createServerFn({ method: "GET" }).handler(async () => {
   const { requireTenant } = await import("~/server/context");
@@ -35,9 +37,10 @@ const salvarDados = createServerFn({ method: "POST" })
     cnes: z.string().optional(),
   }))
   .handler(async ({ data }) => {
-    const { requireTenant } = await import("~/server/context");
+    const { requireTenant, requireRole, ADMIN_ROLES } = await import("~/server/context");
     const { db } = await import("~/db");
-    const { tenantId } = await requireTenant();
+    const { tenantId, userRole } = await requireTenant();
+    requireRole(userRole, ADMIN_ROLES);
     const { eq } = await import("drizzle-orm");
     const { tenants } = await import("~/db/schema");
     await db.update(tenants).set({ ...data, updatedAt: new Date() }).where(eq(tenants.id, tenantId));
@@ -53,9 +56,10 @@ const salvarWhatsapp = createServerFn({ method: "POST" })
     zapiClientToken: z.string().optional(),
   }))
   .handler(async ({ data }) => {
-    const { requireTenant } = await import("~/server/context");
+    const { requireTenant, requireRole, ADMIN_ROLES } = await import("~/server/context");
     const { db } = await import("~/db");
-    const { tenantId } = await requireTenant();
+    const { tenantId, userRole } = await requireTenant();
+    requireRole(userRole, ADMIN_ROLES);
     const { eq } = await import("drizzle-orm");
     const { tenants } = await import("~/db/schema");
     await db.update(tenants).set({ ...data, updatedAt: new Date() }).where(eq(tenants.id, tenantId));
@@ -64,9 +68,10 @@ const salvarWhatsapp = createServerFn({ method: "POST" })
 const testarConexao = createServerFn({ method: "POST" })
   .validator(z.object({ telefone: z.string().min(10) }))
   .handler(async ({ data }) => {
-    const { requireTenant } = await import("~/server/context");
+    const { requireTenant, requireRole, ADMIN_ROLES } = await import("~/server/context");
     const { db } = await import("~/db");
-    const { tenantId } = await requireTenant();
+    const { tenantId, userRole } = await requireTenant();
+    requireRole(userRole, ADMIN_ROLES);
     const { eq } = await import("drizzle-orm");
     const { tenants } = await import("~/db/schema");
 
@@ -104,12 +109,107 @@ const salvarNotificacoes = createServerFn({ method: "POST" })
     notifLembrete: z.boolean(),
   }))
   .handler(async ({ data }) => {
-    const { requireTenant } = await import("~/server/context");
+    const { requireTenant, requireRole, ADMIN_ROLES } = await import("~/server/context");
     const { db } = await import("~/db");
-    const { tenantId } = await requireTenant();
+    const { tenantId, userRole } = await requireTenant();
+    requireRole(userRole, ADMIN_ROLES);
     const { eq } = await import("drizzle-orm");
     const { tenants } = await import("~/db/schema");
     await db.update(tenants).set({ ...data, updatedAt: new Date() }).where(eq(tenants.id, tenantId));
+  });
+
+const membroRoleEnum = z.enum(["admin", "medico", "recepcionista"]);
+
+const getEquipe = createServerFn({ method: "GET" }).handler(async () => {
+  const { requireTenant, requireRole, ADMIN_ROLES } = await import("~/server/context");
+  const { db } = await import("~/db");
+  const { tenantId, userRole } = await requireTenant();
+  requireRole(userRole, ADMIN_ROLES);
+  const { eq, and } = await import("drizzle-orm");
+  const { users } = await import("~/db/schema");
+  return db.query.users.findMany({
+    where: and(eq(users.tenantId, tenantId)),
+    columns: { id: true, name: true, email: true, role: true, ativo: true, createdAt: true },
+    orderBy: (u, { asc }) => [asc(u.createdAt)],
+  });
+});
+
+const criarMembro = createServerFn({ method: "POST" })
+  .validator(z.object({
+    nome: z.string().min(2),
+    email: z.string().email(),
+    senha: z.string().min(6),
+    role: membroRoleEnum,
+  }))
+  .handler(async ({ data }) => {
+    const { requireTenant, requireRole, ADMIN_ROLES } = await import("~/server/context");
+    const { tenantId, userRole } = await requireTenant();
+    requireRole(userRole, ADMIN_ROLES);
+    const { auth } = await import("~/lib/auth");
+    const { db } = await import("~/db");
+    const { eq } = await import("drizzle-orm");
+    const { users } = await import("~/db/schema");
+
+    let signUpResult;
+    try {
+      signUpResult = await auth.api.signUpEmail({
+        body: { name: data.nome, email: data.email, password: data.senha },
+      });
+    } catch {
+      throw new Error("Não foi possível criar o acesso — verifique se o e-mail já está em uso");
+    }
+    if (!signUpResult.user) throw new Error("Não foi possível criar o acesso");
+
+    await db.update(users)
+      .set({ tenantId, role: data.role })
+      .where(eq(users.id, signUpResult.user.id));
+  });
+
+const redefinirSenhaMembro = createServerFn({ method: "POST" })
+  .validator(z.object({ userId: z.string(), novaSenha: z.string().min(6) }))
+  .handler(async ({ data }) => {
+    const { requireTenant, requireRole, ADMIN_ROLES } = await import("~/server/context");
+    const { tenantId, userRole } = await requireTenant();
+    requireRole(userRole, ADMIN_ROLES);
+    const { db } = await import("~/db");
+    const { eq, and } = await import("drizzle-orm");
+    const { users, accounts } = await import("~/db/schema");
+    const { hashPassword } = await import("better-auth/crypto");
+
+    const alvo = await db.query.users.findFirst({ where: and(eq(users.id, data.userId), eq(users.tenantId, tenantId)) });
+    if (!alvo) throw new Error("Usuário não encontrado");
+
+    const hash = await hashPassword(data.novaSenha);
+    await db.update(accounts)
+      .set({ password: hash, updatedAt: new Date() })
+      .where(and(eq(accounts.userId, data.userId), eq(accounts.providerId, "credential")));
+  });
+
+const alterarRoleMembro = createServerFn({ method: "POST" })
+  .validator(z.object({ userId: z.string(), role: membroRoleEnum }))
+  .handler(async ({ data }) => {
+    const { requireTenant, requireRole, ADMIN_ROLES } = await import("~/server/context");
+    const { tenantId, userRole } = await requireTenant();
+    requireRole(userRole, ADMIN_ROLES);
+    const { db } = await import("~/db");
+    const { eq, and } = await import("drizzle-orm");
+    const { users } = await import("~/db/schema");
+    await db.update(users).set({ role: data.role, updatedAt: new Date() })
+      .where(and(eq(users.id, data.userId), eq(users.tenantId, tenantId)));
+  });
+
+const alterarAtivoMembro = createServerFn({ method: "POST" })
+  .validator(z.object({ userId: z.string(), ativo: z.boolean() }))
+  .handler(async ({ data }) => {
+    const { requireTenant, requireRole, ADMIN_ROLES } = await import("~/server/context");
+    const { tenantId, userId, userRole } = await requireTenant();
+    requireRole(userRole, ADMIN_ROLES);
+    if (data.userId === userId) throw new Error("Você não pode desativar sua própria conta");
+    const { db } = await import("~/db");
+    const { eq, and } = await import("drizzle-orm");
+    const { users } = await import("~/db/schema");
+    await db.update(users).set({ ativo: data.ativo, updatedAt: new Date() })
+      .where(and(eq(users.id, data.userId), eq(users.tenantId, tenantId)));
   });
 
 const schemaDados = z.object({
@@ -131,6 +231,7 @@ const tiposClinica = [
 ];
 
 export const Route = createFileRoute("/_app/configuracoes/")({
+  beforeLoad: requireAdminRoute,
   component: ConfiguracoesPage,
 });
 
@@ -463,6 +564,159 @@ function ConfiguracoesPage() {
           </Button>
         </CardContent>
       </Card>
+
+      <EquipeCard />
     </div>
+  );
+}
+
+function EquipeCard() {
+  const qc = useQueryClient();
+  const [addOpen, setAddOpen] = useState(false);
+  const [resetUserId, setResetUserId] = useState<string | null>(null);
+  const [novoMembro, setNovoMembro] = useState<{ nome: string; email: string; senha: string; role: "admin" | "medico" | "recepcionista" }>({ nome: "", email: "", senha: "", role: "recepcionista" });
+  const [novaSenha, setNovaSenha] = useState("");
+
+  const { data: equipe, isLoading } = useQuery({
+    queryKey: ["equipe"],
+    queryFn: () => getEquipe(),
+  });
+
+  const criarMut = useMutation({
+    mutationFn: () => criarMembro({ data: novoMembro }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["equipe"] });
+      toast.success("Membro adicionado");
+      setAddOpen(false);
+      setNovoMembro({ nome: "", email: "", senha: "", role: "recepcionista" });
+    },
+    onError: (e: any) => toast.error(e.message ?? "Erro ao adicionar membro"),
+  });
+
+  const resetMut = useMutation({
+    mutationFn: () => redefinirSenhaMembro({ data: { userId: resetUserId as string, novaSenha } }),
+    onSuccess: () => {
+      toast.success("Senha redefinida");
+      setResetUserId(null);
+      setNovaSenha("");
+    },
+    onError: (e: any) => toast.error(e.message ?? "Erro ao redefinir senha"),
+  });
+
+  const roleMut = useMutation({
+    mutationFn: (v: { userId: string; role: "admin" | "medico" | "recepcionista" }) => alterarRoleMembro({ data: v }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["equipe"] }); toast.success("Papel atualizado"); },
+    onError: () => toast.error("Erro ao atualizar papel"),
+  });
+
+  const ativoMut = useMutation({
+    mutationFn: (v: { userId: string; ativo: boolean }) => alterarAtivoMembro({ data: v }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["equipe"] }); toast.success("Atualizado"); },
+    onError: (e: any) => toast.error(e.message ?? "Erro ao atualizar"),
+  });
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <div>
+          <CardTitle className="text-base">Equipe</CardTitle>
+          <CardDescription className="mt-1">Gerencie os usuários com acesso a esta clínica</CardDescription>
+        </div>
+        <Dialog open={addOpen} onOpenChange={setAddOpen}>
+          <DialogTrigger asChild>
+            <Button size="sm"><UserPlus className="h-4 w-4" /> Adicionar</Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader><DialogTitle>Adicionar membro da equipe</DialogTitle></DialogHeader>
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label>Nome</Label>
+                <Input value={novoMembro.nome} onChange={(e) => setNovoMembro((p) => ({ ...p, nome: e.target.value }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>E-mail</Label>
+                <Input type="email" value={novoMembro.email} onChange={(e) => setNovoMembro((p) => ({ ...p, email: e.target.value }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Senha provisória</Label>
+                <Input type="password" placeholder="Mínimo 6 caracteres" value={novoMembro.senha} onChange={(e) => setNovoMembro((p) => ({ ...p, senha: e.target.value }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Papel</Label>
+                <Select value={novoMembro.role} onValueChange={(v) => setNovoMembro((p) => ({ ...p, role: v as "admin" | "medico" | "recepcionista" }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="admin">Administrador</SelectItem>
+                    <SelectItem value="medico">Profissional</SelectItem>
+                    <SelectItem value="recepcionista">Recepção</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button
+                className="w-full"
+                disabled={criarMut.isPending || !novoMembro.nome || !novoMembro.email || novoMembro.senha.length < 6}
+                onClick={() => criarMut.mutate()}
+              >
+                {criarMut.isPending ? "Adicionando..." : "Adicionar"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        {isLoading ? (
+          <p className="text-sm text-muted-foreground">Carregando...</p>
+        ) : equipe?.length ? (
+          equipe.map((u) => (
+            <div key={u.id} className="flex items-center justify-between rounded-lg border border-border p-3 gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-medium truncate">{u.name}</p>
+                <p className="text-xs text-muted-foreground truncate">{u.email}</p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                {u.role === "owner" ? (
+                  <Badge variant="secondary">Dono</Badge>
+                ) : (
+                  <Select
+                    value={u.role ?? "recepcionista"}
+                    onValueChange={(v) => roleMut.mutate({ userId: u.id, role: v as "admin" | "medico" | "recepcionista" })}
+                  >
+                    <SelectTrigger className="h-8 w-36"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="admin">Administrador</SelectItem>
+                      <SelectItem value="medico">Profissional</SelectItem>
+                      <SelectItem value="recepcionista">Recepção</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+                <Button variant="outline" size="sm" className="h-8" onClick={() => setResetUserId(u.id)}>
+                  <KeyRound className="h-3.5 w-3.5" />
+                </Button>
+                {u.role !== "owner" && (
+                  <Switch checked={u.ativo} onCheckedChange={(v) => ativoMut.mutate({ userId: u.id, ativo: v })} />
+                )}
+              </div>
+            </div>
+          ))
+        ) : (
+          <p className="text-sm text-muted-foreground">Nenhum membro cadastrado</p>
+        )}
+      </CardContent>
+
+      <Dialog open={!!resetUserId} onOpenChange={(v) => !v && setResetUserId(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Redefinir senha</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label>Nova senha</Label>
+              <Input type="password" placeholder="Mínimo 6 caracteres" value={novaSenha} onChange={(e) => setNovaSenha(e.target.value)} />
+            </div>
+            <Button className="w-full" disabled={resetMut.isPending || novaSenha.length < 6} onClick={() => resetMut.mutate()}>
+              {resetMut.isPending ? "Salvando..." : "Redefinir senha"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </Card>
   );
 }

@@ -15,7 +15,7 @@ import { Badge } from "~/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "~/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
 import { toast } from "sonner";
-import { formatCurrency } from "~/lib/utils";
+import { formatCurrency, requireAdminRoute } from "~/lib/utils";
 
 const getServicos = createServerFn({ method: "GET" }).handler(async () => {
   const { requireTenant } = await import("~/server/context");
@@ -39,9 +39,10 @@ const salvarServico = createServerFn({ method: "POST" })
     descricao: z.string().optional(),
   }))
   .handler(async ({ data }) => {
-    const { requireTenant } = await import("~/server/context");
+    const { requireTenant, requireRole, ADMIN_ROLES } = await import("~/server/context");
     const { db } = await import("~/db");
-    const { tenantId } = await requireTenant();
+    const { tenantId, userRole } = await requireTenant();
+    requireRole(userRole, ADMIN_ROLES);
     const { services } = await import("~/db/schema");
     const { eq, and } = await import("drizzle-orm");
     if (data.id) {
@@ -54,9 +55,10 @@ const salvarServico = createServerFn({ method: "POST" })
 const excluirServico = createServerFn({ method: "POST" })
   .validator(z.object({ id: z.string() }))
   .handler(async ({ data }) => {
-    const { requireTenant } = await import("~/server/context");
+    const { requireTenant, requireRole, ADMIN_ROLES } = await import("~/server/context");
     const { db } = await import("~/db");
-    const { tenantId } = await requireTenant();
+    const { tenantId, userRole } = await requireTenant();
+    requireRole(userRole, ADMIN_ROLES);
     const { services } = await import("~/db/schema");
     const { eq, and } = await import("drizzle-orm");
     await db.update(services).set({ ativo: false }).where(and(eq(services.id, data.id), eq(services.tenantId, tenantId)));
@@ -83,6 +85,7 @@ const categorias = [
 type Servico = Awaited<ReturnType<typeof getServicos>>[number];
 
 export const Route = createFileRoute("/_app/servicos/")({
+  beforeLoad: requireAdminRoute,
   component: ServicosPage,
 });
 

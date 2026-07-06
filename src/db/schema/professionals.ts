@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, boolean, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, pgEnum, index } from "drizzle-orm/pg-core";
 import { tenants } from "./tenants";
 
 export const especialidadeEnum = pgEnum("especialidade_enum", [
@@ -27,7 +27,9 @@ export const professionals = pgTable("professionals", {
   ativo: boolean("ativo").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => ({
+  tenantIdx: index("professionals_tenant_id_idx").on(table.tenantId),
+}));
 
 export type Professional = typeof professionals.$inferSelect;
 export type NewProfessional = typeof professionals.$inferInsert;

@@ -33,6 +33,10 @@ export default defineConfig({
       "process.env.DATABASE_URL": JSON.stringify(getEnv("DATABASE_URL")),
       "process.env.BETTER_AUTH_SECRET": JSON.stringify(getEnv("BETTER_AUTH_SECRET")),
       "process.env.BETTER_AUTH_URL": JSON.stringify(getEnv("BETTER_AUTH_URL")),
+      "process.env.ASAAS_API_KEY": JSON.stringify(getEnv("ASAAS_API_KEY")),
+      "process.env.ASAAS_BASE_URL": JSON.stringify(getEnv("ASAAS_BASE_URL")),
+      "process.env.ASAAS_WEBHOOK_TOKEN": JSON.stringify(getEnv("ASAAS_WEBHOOK_TOKEN")),
+      "process.env.SUBSCRIPTION_PRICE_OVERRIDE": JSON.stringify(getEnv("SUBSCRIPTION_PRICE_OVERRIDE")),
     },
     plugins: [
       tailwindcss(),

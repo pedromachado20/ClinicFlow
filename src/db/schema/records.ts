@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, index } from "drizzle-orm/pg-core";
 import { tenants } from "./tenants";
 import { patients } from "./patients";
 import { professionals } from "./professionals";
@@ -21,7 +21,10 @@ export const records = pgTable("records", {
   observacoes: text("observacoes"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => ({
+  tenantIdx: index("records_tenant_id_idx").on(table.tenantId),
+  pacienteIdx: index("records_paciente_id_idx").on(table.pacienteId),
+}));
 
 export type Record_ = typeof records.$inferSelect;
 export type NewRecord = typeof records.$inferInsert;

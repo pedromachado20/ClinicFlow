@@ -24,7 +24,9 @@ export const Route = createRootRouteWithContext<RouterContext>()({
     links: [{ rel: "stylesheet", href: appCss }],
   }),
   component: RootComponent,
-  errorComponent: ({ error }) => (
+  errorComponent: ({ error }) => {
+    console.error("Root error:", error);
+    return (
     <html>
       <head><HeadContent /></head>
       <body>
@@ -37,7 +39,8 @@ export const Route = createRootRouteWithContext<RouterContext>()({
         <Scripts />
       </body>
     </html>
-  ),
+    );
+  },
 });
 
 function RootComponent() {

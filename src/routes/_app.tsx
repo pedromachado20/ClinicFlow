@@ -19,32 +19,43 @@ const checkSession = createServerFn({ method: "GET" }).handler(async () => {
 
   const user = await db.query.users.findFirst({
     where: eq(users.id, session.user.id),
-    columns: { tenantId: true, role: true },
+    columns: { tenantId: true, role: true, ativo: true },
   });
 
   if (!user?.tenantId) {
     throw redirect({ to: "/onboarding" });
   }
+  if (!user.ativo) {
+    throw redirect({ to: "/login" });
+  }
 
   const tenant = await db.query.tenants.findFirst({
     where: eq(tenants.id, user.tenantId),
-    columns: { nome: true },
+    columns: { nome: true, status: true, trialEndsAt: true, asaasSubscriptionId: true },
   });
+
+  const trialExpirado = tenant?.status === "trial" && tenant.trialEndsAt ? tenant.trialEndsAt.getTime() < Date.now() : false;
+  const bloqueado = tenant?.status === "suspenso" || (trialExpirado && !tenant?.asaasSubscriptionId);
 
   return {
     session,
     tenantNome: tenant?.nome ?? "",
     userRole: user.role ?? "recepcionista",
+    bloqueado,
   };
 });
 
 export const Route = createFileRoute("/_app")({
-  beforeLoad: async () => {
+  beforeLoad: async ({ location }) => {
     const data = await checkSession();
     if (!data) throw redirect({ to: "/login" });
+    if (data.bloqueado && location.pathname !== "/assinatura") {
+      throw redirect({ to: "/assinatura" });
+    }
     return { session: data.session, tenantNome: data.tenantNome, userRole: data.userRole };
   },
   component: AppLayout,
+  errorComponent: AppErrorFallback,
 });
 
 function AppLayout() {
@@ -55,6 +66,25 @@ function AppLayout() {
         <AppHeader />
         <main className="flex-1 overflow-y-auto p-6">
           <Outlet />
+        </main>
+      </div>
+    </div>
+  );
+}
+
+function AppErrorFallback({ error }: { error: unknown }) {
+  const message = error instanceof Error ? error.message : "Erro inesperado";
+  console.error("Route error:", error);
+  return (
+    <div className="flex h-screen overflow-hidden bg-background">
+      <AppSidebar />
+      <div className="flex flex-col flex-1 overflow-hidden">
+        <AppHeader />
+        <main className="flex-1 overflow-y-auto p-6 flex items-center justify-center">
+          <div className="text-center max-w-md">
+            <h2 className="text-lg font-semibold text-destructive">Algo deu errado</h2>
+            <p className="mt-2 text-sm text-muted-foreground">{message}</p>
+          </div>
         </main>
       </div>
     </div>

@@ -13,7 +13,7 @@ import { Badge } from "~/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "~/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
 import { toast } from "sonner";
-import { formatPhone } from "~/lib/utils";
+import { formatPhone, requireAdminRoute } from "~/lib/utils";
 
 const getProfissionais = createServerFn({ method: "GET" }).handler(async () => {
   const { requireTenant } = await import("~/server/context");
@@ -42,9 +42,10 @@ const salvarProfissional = createServerFn({ method: "POST" })
     fotoUrl: z.string().optional(),
   }))
   .handler(async ({ data }) => {
-    const { requireTenant } = await import("~/server/context");
+    const { requireTenant, requireRole, ADMIN_ROLES } = await import("~/server/context");
     const { db } = await import("~/db");
-    const { tenantId } = await requireTenant();
+    const { tenantId, userRole } = await requireTenant();
+    requireRole(userRole, ADMIN_ROLES);
     const { professionals } = await import("~/db/schema");
     const { eq, and } = await import("drizzle-orm");
     const payload = { ...data, especialidade: data.especialidade as any };
@@ -58,9 +59,10 @@ const salvarProfissional = createServerFn({ method: "POST" })
 const excluirProfissional = createServerFn({ method: "POST" })
   .validator(z.object({ id: z.string() }))
   .handler(async ({ data }) => {
-    const { requireTenant } = await import("~/server/context");
+    const { requireTenant, requireRole, ADMIN_ROLES } = await import("~/server/context");
     const { db } = await import("~/db");
-    const { tenantId } = await requireTenant();
+    const { tenantId, userRole } = await requireTenant();
+    requireRole(userRole, ADMIN_ROLES);
     const { professionals } = await import("~/db/schema");
     const { eq, and } = await import("drizzle-orm");
     await db.update(professionals).set({ ativo: false }).where(and(eq(professionals.id, data.id), eq(professionals.tenantId, tenantId)));
@@ -81,6 +83,7 @@ const conselhos = ["CRM", "CRO", "CRP", "CREFITO", "CRN", "COREN"];
 type Profissional = Awaited<ReturnType<typeof getProfissionais>>[number];
 
 export const Route = createFileRoute("/_app/profissionais/")({
+  beforeLoad: requireAdminRoute,
   component: ProfissionaisPage,
 });
 

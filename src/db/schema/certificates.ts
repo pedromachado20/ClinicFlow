@@ -1,4 +1,4 @@
-import { pgTable, text, integer, timestamp, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, timestamp, pgEnum, index } from "drizzle-orm/pg-core";
 import { tenants } from "./tenants";
 import { patients } from "./patients";
 import { professionals } from "./professionals";
@@ -25,7 +25,10 @@ export const certificates = pgTable("certificates", {
   cidade: text("cidade"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => ({
+  tenantIdx: index("certificates_tenant_id_idx").on(table.tenantId),
+  pacienteIdx: index("certificates_paciente_id_idx").on(table.pacienteId),
+}));
 
 export type Certificate = typeof certificates.$inferSelect;
 export type NewCertificate = typeof certificates.$inferInsert;

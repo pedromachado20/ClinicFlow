@@ -1,4 +1,4 @@
-import { pgTable, text, integer, timestamp, boolean, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, timestamp, boolean, pgEnum, index } from "drizzle-orm/pg-core";
 import { tenants } from "./tenants";
 
 export const servicoCategoriaEnum = pgEnum("servico_categoria", [
@@ -22,7 +22,9 @@ export const services = pgTable("services", {
   ativo: boolean("ativo").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => ({
+  tenantIdx: index("services_tenant_id_idx").on(table.tenantId),
+}));
 
 export type Service = typeof services.$inferSelect;
 export type NewService = typeof services.$inferInsert;

@@ -61,9 +61,10 @@ const salvarPaciente = createServerFn({ method: "POST" })
 const excluirPaciente = createServerFn({ method: "POST" })
   .validator(z.object({ id: z.string() }))
   .handler(async ({ data }) => {
-    const { requireTenant } = await import("~/server/context");
+    const { requireTenant, requireRole, ADMIN_ROLES } = await import("~/server/context");
     const { db } = await import("~/db");
-    const { tenantId } = await requireTenant();
+    const { tenantId, userRole } = await requireTenant();
+    requireRole(userRole, ADMIN_ROLES);
     const { patients } = await import("~/db/schema");
     const { eq, and } = await import("drizzle-orm");
     await db.update(patients).set({ ativo: false }).where(and(eq(patients.id, data.id), eq(patients.tenantId, tenantId)));

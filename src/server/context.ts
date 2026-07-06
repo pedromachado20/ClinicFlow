@@ -5,7 +5,14 @@ import { users } from "~/db/schema";
 export type UserRole = "owner" | "admin" | "medico" | "recepcionista";
 
 export const ADMIN_ROLES: UserRole[] = ["owner", "admin"];
+export const CLINICAL_ROLES: UserRole[] = ["owner", "admin", "medico"];
 export const ALL_ROLES: UserRole[] = ["owner", "admin", "medico", "recepcionista"];
+
+export function requireRole(userRole: UserRole | null | undefined, allowed: UserRole[]) {
+  if (!userRole || !allowed.includes(userRole)) {
+    throw new Error("Permissão negada para esta ação");
+  }
+}
 
 export async function requireAuth() {
   const [{ getWebRequest }, { auth }] = await Promise.all([
@@ -29,6 +36,7 @@ export async function requireTenant() {
   });
 
   if (!user?.tenantId) throw new Error("Clínica não configurada");
+  if (!user.ativo) throw new Error("Usuário desativado");
 
   return {
     tenantId: user.tenantId,

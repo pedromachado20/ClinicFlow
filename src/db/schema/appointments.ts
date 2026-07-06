@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, pgEnum, index } from "drizzle-orm/pg-core";
 import { tenants } from "./tenants";
 import { patients } from "./patients";
 import { professionals } from "./professionals";
@@ -35,7 +35,11 @@ export const appointments = pgTable("appointments", {
   observacoes: text("observacoes"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => ({
+  tenantDataIdx: index("appointments_tenant_id_data_idx").on(table.tenantId, table.data),
+  pacienteIdx: index("appointments_paciente_id_idx").on(table.pacienteId),
+  professionalIdx: index("appointments_professional_id_idx").on(table.professionalId),
+}));
 
 export type Appointment = typeof appointments.$inferSelect;
 export type NewAppointment = typeof appointments.$inferInsert;

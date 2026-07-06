@@ -19,6 +19,7 @@ const pageTitles: Record<string, string> = {
   "/financeiro": "Financeiro",
   "/relatorios": "Relatórios",
   "/configuracoes": "Configurações",
+  "/assinatura": "Assinatura",
 };
 
 export function AppHeader() {

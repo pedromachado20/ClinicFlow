@@ -36,6 +36,8 @@ const criarClinica = createServerFn({ method: "POST" })
 
     const slug = slugify(data.nomeClinica) + "-" + Math.random().toString(36).slice(2, 6);
     const tenantId = crypto.randomUUID();
+    const { TRIAL_DAYS } = await import("~/lib/billing");
+    const trialEndsAt = new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000);
 
     await db.insert(tenants).values({
       id: tenantId,
@@ -48,7 +50,17 @@ const criarClinica = createServerFn({ method: "POST" })
       estado: data.estado,
       cnpj: data.cnpj,
       cnes: data.cnes,
+      trialEndsAt,
     });
+
+    try {
+      const { criarCliente } = await import("~/server/asaas");
+      const { eq } = await import("drizzle-orm");
+      const cliente = await criarCliente({ nome: data.nomeClinica, email: data.email, telefone: data.telefone, cpfCnpj: data.cnpj });
+      await db.update(tenants).set({ asaasCustomerId: cliente.id }).where(eq(tenants.id, tenantId));
+    } catch (err) {
+      console.error("Falha ao criar cliente Asaas:", err);
+    }
 
     const signUpResult = await auth.api.signUpEmail({
       body: {

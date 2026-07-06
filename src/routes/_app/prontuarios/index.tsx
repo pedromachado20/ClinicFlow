@@ -77,9 +77,10 @@ const salvarProntuario = createServerFn({ method: "POST" })
     observacoes: z.string().optional(),
   }))
   .handler(async ({ data }) => {
-    const { requireTenant } = await import("~/server/context");
+    const { requireTenant, requireRole, CLINICAL_ROLES } = await import("~/server/context");
     const { db } = await import("~/db");
-    const { tenantId } = await requireTenant();
+    const { tenantId, userRole } = await requireTenant();
+    requireRole(userRole, CLINICAL_ROLES);
     const { records } = await import("~/db/schema");
     await db.insert(records).values({ id: crypto.randomUUID(), tenantId, ...data });
   });
@@ -93,9 +94,10 @@ const salvarReceita = createServerFn({ method: "POST" })
     observacoes: z.string().optional(),
   }))
   .handler(async ({ data }) => {
-    const { requireTenant } = await import("~/server/context");
+    const { requireTenant, requireRole, CLINICAL_ROLES } = await import("~/server/context");
     const { db } = await import("~/db");
-    const { tenantId } = await requireTenant();
+    const { tenantId, userRole } = await requireTenant();
+    requireRole(userRole, CLINICAL_ROLES);
     const { prescriptions } = await import("~/db/schema");
     await db.insert(prescriptions).values({ id: crypto.randomUUID(), tenantId, ...data });
   });
@@ -114,9 +116,10 @@ const salvarAtestado = createServerFn({ method: "POST" })
     cidade: z.string().optional(),
   }))
   .handler(async ({ data }) => {
-    const { requireTenant } = await import("~/server/context");
+    const { requireTenant, requireRole, CLINICAL_ROLES } = await import("~/server/context");
     const { db } = await import("~/db");
-    const { tenantId } = await requireTenant();
+    const { tenantId, userRole } = await requireTenant();
+    requireRole(userRole, CLINICAL_ROLES);
     const { certificates } = await import("~/db/schema");
     await db.insert(certificates).values({ id: crypto.randomUUID(), tenantId, ...data as any });
   });
@@ -441,7 +444,7 @@ function ProntuariosPage() {
                       <CardContent className="p-4">
                         <div className="flex items-start justify-between">
                           <div>
-                            <p className="font-medium text-sm">{new Date(a.createdAt.toString().slice(0,10) + "T00:00:00").toLocaleDateString("pt-BR")}</p>
+                            <p className="font-medium text-sm">{new Date(a.createdAt).toLocaleDateString("pt-BR")}</p>
                             <p className="text-xs text-muted-foreground">{a.professional?.nome}</p>
                             <p className="text-xs text-muted-foreground capitalize mt-0.5">{a.tipo} · {a.diasAfastamento} dia(s)</p>
                           </div>
@@ -461,7 +464,7 @@ function ProntuariosPage() {
                                 dataFim: a.dataFim,
                                 cid: a.cid ?? undefined,
                                 motivo: a.motivo ?? undefined,
-                                data: a.createdAt.toString().slice(0, 10),
+                                data: new Date(a.createdAt).toISOString().slice(0, 10),
                               });
                             }
                           }}>

@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, boolean, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, pgEnum, index } from "drizzle-orm/pg-core";
 import { tenants } from "./tenants";
 
 export const userRoleClinicEnum = pgEnum("user_role_clinic", [
@@ -19,7 +19,9 @@ export const users = pgTable("user", {
   ativo: boolean("ativo").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => ({
+  tenantIdx: index("user_tenant_id_idx").on(table.tenantId),
+}));
 
 export const sessions = pgTable("session", {
   id: text("id").primaryKey(),
