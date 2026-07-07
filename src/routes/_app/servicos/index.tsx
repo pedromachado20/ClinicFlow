@@ -29,11 +29,13 @@ const getServicos = createServerFn({ method: "GET" }).handler(async () => {
   });
 });
 
+const CATEGORIAS_SERVICO = ["consulta", "retorno", "exame", "procedimento", "cirurgia", "terapia", "outro"] as const;
+
 const salvarServico = createServerFn({ method: "POST" })
   .validator(z.object({
     id: z.string().optional(),
     nome: z.string().min(1),
-    categoria: z.string(),
+    categoria: z.enum(CATEGORIAS_SERVICO),
     preco: z.string(),
     duracao: z.number(),
     descricao: z.string().optional(),
@@ -66,7 +68,7 @@ const excluirServico = createServerFn({ method: "POST" })
 
 const schema = z.object({
   nome: z.string().min(1, "Nome obrigatório"),
-  categoria: z.string().min(1),
+  categoria: z.string().min(1, "Selecione uma categoria"),
   preco: z.string(),
   duracao: z.coerce.number().min(1),
   descricao: z.string().optional(),
@@ -119,7 +121,7 @@ function ServicosPage() {
 
   const salvar = useMutation({
     mutationFn: (values: z.infer<typeof schema>) =>
-      salvarServico({ data: { ...values, id: editando?.id } }),
+      salvarServico({ data: { ...values, categoria: values.categoria as (typeof CATEGORIAS_SERVICO)[number], id: editando?.id } }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["servicos"] }); toast.success(editando ? "Serviço atualizado" : "Serviço criado"); setOpen(false); },
     onError: () => toast.error("Erro ao salvar"),
   });

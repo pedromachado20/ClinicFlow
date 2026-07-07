@@ -12,7 +12,7 @@ import { Badge } from "~/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "~/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
 import { toast } from "sonner";
-import { formatCurrency } from "~/lib/utils";
+import { formatCurrency, hojeLocal } from "~/lib/utils";
 import { printTable } from "~/lib/pdf";
 
 const getAgenda = createServerFn({ method: "GET" })
@@ -59,11 +59,15 @@ const salvarAgendamento = createServerFn({ method: "POST" })
     const { eq, and } = await import("drizzle-orm");
 
     const [service, paciente, profissional, tenant] = await Promise.all([
-      db.query.services.findFirst({ where: eq(services.id, data.serviceId) }),
-      db.query.patients.findFirst({ where: eq(patients.id, data.pacienteId), columns: { nome: true, telefone: true } }),
-      db.query.professionals.findFirst({ where: eq(professionals.id, data.professionalId), columns: { nome: true } }),
+      db.query.services.findFirst({ where: and(eq(services.id, data.serviceId), eq(services.tenantId, tenantId)) }),
+      db.query.patients.findFirst({ where: and(eq(patients.id, data.pacienteId), eq(patients.tenantId, tenantId)), columns: { nome: true, telefone: true } }),
+      db.query.professionals.findFirst({ where: and(eq(professionals.id, data.professionalId), eq(professionals.tenantId, tenantId)), columns: { nome: true } }),
       db.query.tenants.findFirst({ where: eq(tenants.id, tenantId), columns: { nome: true, notifAgendamento: true } }),
     ]);
+
+    if (!service || !paciente || !profissional) {
+      throw new Error("Paciente, profissional ou serviço inválido.");
+    }
 
     // Valida conflito de horário para o mesmo profissional
     const { and: $and, eq: $eq, ne, sql: $sql } = await import("drizzle-orm");
@@ -225,7 +229,7 @@ function AgendaPage() {
   const [editando, setEditando] = useState<Agendamento | null>(null);
   const [excluindo, setExcluindo] = useState<string | null>(null);
   const [detalhe, setDetalhe] = useState<Agendamento | null>(null);
-  const [dataAtual, setDataAtual] = useState(() => new Date().toISOString().slice(0, 10));
+  const [dataAtual, setDataAtual] = useState(() => hojeLocal());
 
   const [pacSel, setPacSel] = useState("");
   const [proSel, setProSel] = useState("");
@@ -338,7 +342,7 @@ function AgendaPage() {
             {new Date(dataAtual + "T00:00:00").toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })}
           </span>
           <Button variant="ghost" size="icon" onClick={() => mudarDia(1)}><ChevronRight className="h-4 w-4" /></Button>
-          <Button variant="ghost" size="sm" onClick={() => setDataAtual(new Date().toISOString().slice(0, 10))}>Hoje</Button>
+          <Button variant="ghost" size="sm" onClick={() => setDataAtual(hojeLocal())}>Hoje</Button>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={handlePrint} disabled={!data?.agendamentos?.length}>

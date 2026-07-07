@@ -15,6 +15,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "~/components/ui/tabs";
 import { toast } from "sonner";
 import { printProntuario, printReceita, printAtestado } from "~/lib/pdf";
+import { hojeLocal } from "~/lib/utils";
+
+async function assertPacienteEProfissional(tenantId: string, pacienteId: string, professionalId: string) {
+  const { db } = await import("~/db");
+  const { eq, and } = await import("drizzle-orm");
+  const { patients, professionals } = await import("~/db/schema");
+  const [paciente, profissional] = await Promise.all([
+    db.query.patients.findFirst({ where: and(eq(patients.id, pacienteId), eq(patients.tenantId, tenantId)), columns: { id: true } }),
+    db.query.professionals.findFirst({ where: and(eq(professionals.id, professionalId), eq(professionals.tenantId, tenantId)), columns: { id: true } }),
+  ]);
+  if (!paciente || !profissional) throw new Error("Paciente ou profissional inválido.");
+}
 
 const getProntuariosData = createServerFn({ method: "GET" }).handler(async () => {
   const { requireTenant } = await import("~/server/context");
@@ -82,6 +94,7 @@ const salvarProntuario = createServerFn({ method: "POST" })
     const { tenantId, userRole } = await requireTenant();
     requireRole(userRole, CLINICAL_ROLES);
     const { records } = await import("~/db/schema");
+    await assertPacienteEProfissional(tenantId, data.pacienteId, data.professionalId);
     await db.insert(records).values({ id: crypto.randomUUID(), tenantId, ...data });
   });
 
@@ -99,6 +112,7 @@ const salvarReceita = createServerFn({ method: "POST" })
     const { tenantId, userRole } = await requireTenant();
     requireRole(userRole, CLINICAL_ROLES);
     const { prescriptions } = await import("~/db/schema");
+    await assertPacienteEProfissional(tenantId, data.pacienteId, data.professionalId);
     await db.insert(prescriptions).values({ id: crypto.randomUUID(), tenantId, ...data });
   });
 
@@ -121,6 +135,7 @@ const salvarAtestado = createServerFn({ method: "POST" })
     const { tenantId, userRole } = await requireTenant();
     requireRole(userRole, CLINICAL_ROLES);
     const { certificates } = await import("~/db/schema");
+    await assertPacienteEProfissional(tenantId, data.pacienteId, data.professionalId);
     await db.insert(certificates).values({ id: crypto.randomUUID(), tenantId, ...data as any });
   });
 
@@ -149,7 +164,7 @@ function ProntuariosPage() {
   // Prontuário state
   const [openPront, setOpenPront] = useState(false);
   const [proProSel, setProProSel] = useState("");
-  const [proData, setProData] = useState(() => new Date().toISOString().slice(0, 10));
+  const [proData, setProData] = useState(() => hojeLocal());
   const [proQueixa, setProQueixa] = useState("");
   const [proHist, setProHist] = useState("");
   const [proExame, setProExame] = useState("");
@@ -162,18 +177,18 @@ function ProntuariosPage() {
   // Receita state
   const [openRec, setOpenRec] = useState(false);
   const [recProSel, setRecProSel] = useState("");
-  const [recData, setRecData] = useState(() => new Date().toISOString().slice(0, 10));
+  const [recData, setRecData] = useState(() => hojeLocal());
   const [recMeds, setRecMeds] = useState<Medicamento[]>([{ nome: "", dosagem: "", via: "Oral", posologia: "", duracao: "", quantidade: "" }]);
   const [recObs, setRecObs] = useState("");
 
   // Atestado state
   const [openAt, setOpenAt] = useState(false);
   const [atProSel, setAtProSel] = useState("");
-  const [atData, setAtData] = useState(() => new Date().toISOString().slice(0, 10));
+  const [atData, setAtData] = useState(() => hojeLocal());
   const [atTipo, setAtTipo] = useState("afastamento");
   const [atDias, setAtDias] = useState(1);
-  const [atDataInicio, setAtDataInicio] = useState(() => new Date().toISOString().slice(0, 10));
-  const [atDataFim, setAtDataFim] = useState(() => new Date().toISOString().slice(0, 10));
+  const [atDataInicio, setAtDataInicio] = useState(() => hojeLocal());
+  const [atDataFim, setAtDataFim] = useState(() => hojeLocal());
   const [atCid, setAtCid] = useState("");
   const [atMotivo, setAtMotivo] = useState("");
 
@@ -340,7 +355,7 @@ function ProntuariosPage() {
               <TabsContent value="prontuarios">
                 <div className="flex justify-end mb-3">
                   <Button size="sm" onClick={() => {
-                    setProProSel(""); setProData(new Date().toISOString().slice(0, 10));
+                    setProProSel(""); setProData(hojeLocal());
                     setProQueixa(""); setProHist(""); setProExame(""); setProDiag("");
                     setProCid(""); setProConduta(""); setProRetorno(""); setProObs("");
                     setOpenPront(true);
@@ -374,7 +389,7 @@ function ProntuariosPage() {
               <TabsContent value="receitas">
                 <div className="flex justify-end mb-3">
                   <Button size="sm" onClick={() => {
-                    setRecProSel(""); setRecData(new Date().toISOString().slice(0, 10));
+                    setRecProSel(""); setRecData(hojeLocal());
                     setRecMeds([{ nome: "", dosagem: "", via: "Oral", posologia: "", duracao: "", quantidade: "" }]);
                     setRecObs(""); setOpenRec(true);
                   }}>
@@ -425,9 +440,9 @@ function ProntuariosPage() {
               <TabsContent value="atestados">
                 <div className="flex justify-end mb-3">
                   <Button size="sm" onClick={() => {
-                    setAtProSel(""); setAtData(new Date().toISOString().slice(0, 10));
+                    setAtProSel(""); setAtData(hojeLocal());
                     setAtTipo("afastamento"); setAtDias(1);
-                    const hoje = new Date().toISOString().slice(0, 10);
+                    const hoje = hojeLocal();
                     setAtDataInicio(hoje); setAtDataFim(hoje);
                     setAtCid(""); setAtMotivo(""); setOpenAt(true);
                   }}>

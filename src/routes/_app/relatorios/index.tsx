@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { BarChart3, TrendingUp, Users, CalendarDays, Sun, Activity, Stethoscope, Printer } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
-import { formatCurrency, requireAdminRoute } from "~/lib/utils";
+import { formatCurrency, requireAdminRoute, hojeLocal, primeiroDiaMesLocal } from "~/lib/utils";
 import { printRelatorio } from "~/lib/pdf";
 
 const getRelatorios = createServerFn({ method: "GET" }).handler(async () => {
@@ -15,8 +15,8 @@ const getRelatorios = createServerFn({ method: "GET" }).handler(async () => {
   const { eq, and, gte, sql } = await import("drizzle-orm");
   const { appointments, patients, transacoes, services, tenants } = await import("~/db/schema");
 
-  const hoje = new Date().toISOString().slice(0, 10);
-  const inicioMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
+  const hoje = hojeLocal();
+  const inicioMes = primeiroDiaMesLocal();
 
   // Usa sql`` com literais inline para colunas pgEnum — evita bug de cast text→enum no Neon HTTP
   const [pacTotal, mesStat, receitaMes, topServicos, hojeStat, receitaHoje, tenant, servicosTipo] = await Promise.all([

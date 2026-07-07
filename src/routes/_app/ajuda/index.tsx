@@ -757,8 +757,8 @@ function imprimirManual() {
 // ─── Página ────────────────────────────────────────────────────────────────────
 
 function AjudaPage() {
-  const [secaoAtiva, setSecaoAtiva] = useState(secoes[0].id);
-  const secao = secoes.find((s) => s.id === secaoAtiva) ?? secoes[0];
+  const [secaoAtiva, setSecaoAtiva] = useState(secoes[0]!.id);
+  const secao = secoes.find((s) => s.id === secaoAtiva) ?? secoes[0]!;
 
   return (
     <div className="-m-6 flex overflow-hidden" style={{ height: "calc(100vh - 56px)" }}>
@@ -811,7 +811,7 @@ function AjudaPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setSecaoAtiva(secoes[secoes.findIndex((s) => s.id === secaoAtiva) - 1].id)}
+                onClick={() => setSecaoAtiva(secoes[secoes.findIndex((s) => s.id === secaoAtiva) - 1]!.id)}
               >
                 ← Capítulo anterior
               </Button>
@@ -819,7 +819,7 @@ function AjudaPage() {
             {secoes.findIndex((s) => s.id === secaoAtiva) < secoes.length - 1 ? (
               <Button
                 size="sm"
-                onClick={() => setSecaoAtiva(secoes[secoes.findIndex((s) => s.id === secaoAtiva) + 1].id)}
+                onClick={() => setSecaoAtiva(secoes[secoes.findIndex((s) => s.id === secaoAtiva) + 1]!.id)}
               >
                 Próximo capítulo →
               </Button>

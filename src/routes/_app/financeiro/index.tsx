@@ -14,7 +14,7 @@ import { Label } from "~/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "~/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
 import { toast } from "sonner";
-import { formatCurrency, requireAdminRoute } from "~/lib/utils";
+import { formatCurrency, requireAdminRoute, hojeLocal, primeiroDiaMesLocal } from "~/lib/utils";
 
 const getFinanceiro = createServerFn({ method: "GET" }).handler(async () => {
   const { requireTenant, requireRole, ADMIN_ROLES } = await import("~/server/context");
@@ -24,8 +24,8 @@ const getFinanceiro = createServerFn({ method: "GET" }).handler(async () => {
   const { eq, and, gte, sql, desc } = await import("drizzle-orm");
   const { transacoes, tenants } = await import("~/db/schema");
 
-  const hoje = new Date().toISOString().slice(0, 10);
-  const inicioMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
+  const hoje = hojeLocal();
+  const inicioMes = primeiroDiaMesLocal();
 
   const [receitas, despesas, receitaHoje, despesaHoje, lista, tenant] = await Promise.all([
     db.select({ total: sql<string>`coalesce(sum(valor::numeric), 0)` }).from(transacoes).where(and(eq(transacoes.tenantId, tenantId), eq(transacoes.tipo, "receita"), gte(transacoes.data, inicioMes))),
@@ -232,7 +232,7 @@ function FinanceiroPage() {
                   </div>
                   <div className="space-y-1.5">
                     <Label>Data</Label>
-                    <Input type="date" {...register("data")} defaultValue={new Date().toISOString().slice(0, 10)} />
+                    <Input type="date" {...register("data")} defaultValue={hojeLocal()} />
                   </div>
                 </div>
                 <Button type="submit" className="w-full" disabled={criar.isPending}>

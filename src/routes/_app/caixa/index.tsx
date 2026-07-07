@@ -8,7 +8,7 @@ import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Badge } from "~/components/ui/badge";
 import { toast } from "sonner";
-import { formatCurrency } from "~/lib/utils";
+import { formatCurrency, hojeLocal } from "~/lib/utils";
 import { printCupom, printRecibo } from "~/lib/pdf";
 
 const getCaixa = createServerFn({ method: "GET" })
@@ -115,7 +115,7 @@ type Grupo = Awaited<ReturnType<typeof getCaixa>>["grupos"][number];
 
 function CaixaPage() {
   const qc = useQueryClient();
-  const [dataAtual, setDataAtual] = useState(() => new Date().toISOString().slice(0, 10));
+  const [dataAtual, setDataAtual] = useState(() => hojeLocal());
   const [busca, setBusca] = useState("");
   const [selecionado, setSelecionado] = useState<Grupo | null>(null);
   const [desconto, setDesconto] = useState("0");
@@ -204,7 +204,7 @@ function CaixaPage() {
             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => mudarDia(1)}>
               <ChevronRight className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="sm" className="h-7 text-xs px-2" onClick={() => { setDataAtual(new Date().toISOString().slice(0, 10)); setSelecionado(null); }}>
+            <Button variant="ghost" size="sm" className="h-7 text-xs px-2" onClick={() => { setDataAtual(hojeLocal()); setSelecionado(null); }}>
               Hoje
             </Button>
           </div>

@@ -15,6 +15,14 @@ export function requireAdminRoute({ context }: { context: { userRole?: UserRole 
   }
 }
 
+export function hojeLocal(): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
+}
+
+export function primeiroDiaMesLocal(): string {
+  return hojeLocal().slice(0, 7) + "-01";
+}
+
 export function formatCurrency(value: number | string) {
   const num = typeof value === "string" ? parseFloat(value) : value;
   return new Intl.NumberFormat("pt-BR", {

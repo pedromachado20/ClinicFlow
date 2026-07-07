@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
 import { toast } from "sonner";
-import { formatCurrency } from "~/lib/utils";
+import { formatCurrency, hojeLocal } from "~/lib/utils";
 import type { UserRole } from "~/server/context";
 
 const getAssinatura = createServerFn({ method: "GET" }).handler(async () => {
@@ -45,7 +45,7 @@ const assinarAgora = createServerFn({ method: "POST" }).handler(async () => {
     await db.update(tenants).set({ asaasCustomerId: customerId, updatedAt: new Date() }).where(eq(tenants.id, tenantId));
   }
 
-  const hoje = new Date().toISOString().slice(0, 10);
+  const hoje = hojeLocal();
   const assinatura = await criarAssinatura({
     customerId,
     valor: SUBSCRIPTION_PRICE,
