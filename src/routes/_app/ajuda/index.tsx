@@ -600,12 +600,16 @@ const secoes: Secao[] = [
 
         <H3>Como atualizar os dados da clínica?</H3>
         <Passo n={1}>Clique em "Configurações" no menu da esquerda.</Passo>
-        <Passo n={2}>Na seção "Dados da Clínica", você pode alterar: Nome da Clínica, Email, Telefone, Cidade, Estado, CNPJ e CNES.</Passo>
+        <Passo n={2}>Na seção "Dados da Clínica", você pode alterar: Nome da Clínica, Email, Telefone, Cidade, Estado, CPF ou CNPJ e CNES.</Passo>
         <Passo n={3}>Após editar, clique em <strong>"Salvar Dados"</strong>.</Passo>
 
         <Atencao>
           O nome da clínica que você coloca aqui aparece em todos os documentos impressos: receitas, atestados, prontuários e relatórios. Mantenha atualizado!
         </Atencao>
+
+        <Dica>
+          O campo "CPF ou CNPJ" precisa estar preenchido antes de assinar o plano — veja o capítulo <strong>Assinatura</strong>. Aceita tanto o CNPJ da clínica quanto o CPF, para profissionais autônomos sem CNPJ.
+        </Dica>
 
         <H3>Como configurar o WhatsApp automático?</H3>
         <P>O sistema pode enviar mensagens automáticas para os pacientes quando uma consulta é marcada ou confirmada. Para isso, você precisa de uma conta no WhatsApp Business conectada a um dos serviços compatíveis.</P>
@@ -615,6 +619,10 @@ const secoes: Secao[] = [
         <Passo n={4}>Preencha as credenciais fornecidas pelo seu provedor (URL, API Key, Instância).</Passo>
         <Passo n={5}>Clique em <strong>"Salvar WhatsApp"</strong>.</Passo>
         <Passo n={6}>Use o campo de teste para enviar uma mensagem de teste ao seu próprio número e confirmar que está funcionando.</Passo>
+
+        <Atencao>
+          Por segurança, o Token/API Key e o Client Token nunca aparecem preenchidos quando você reabre a tela de Configurações — o campo fica em branco mesmo já estando configurado (você verá o aviso "configurado — deixe em branco para manter"). Isso é normal: se você não digitar nada nesses campos e clicar em "Salvar WhatsApp", a credencial já salva continua valendo. Só preencha o campo de novo se quiser trocar a credencial.
+        </Atencao>
 
         <H3>Como ativar as notificações automáticas?</H3>
         <Passo n={1}>Na seção "Notificações Automáticas", você verá duas opções:</Passo>
@@ -631,6 +639,51 @@ const secoes: Secao[] = [
 
         <Dica>
           O WhatsApp automático só funciona se o paciente tiver o telefone cadastrado na ficha. Sempre preencha o telefone no cadastro do paciente!
+        </Dica>
+      </>
+    ),
+  },
+  {
+    id: "assinatura",
+    emoji: "💳",
+    titulo: "Assinatura — Trial e Cobrança",
+    conteudo: (
+      <>
+        <H2>Como funciona o plano do ClinicFlow?</H2>
+        <P>
+          Toda clínica começa com um período de teste gratuito. Depois desse período, é preciso assinar o plano para continuar usando o sistema normalmente.
+        </P>
+        <Lista itens={[
+          "7 dias de teste grátis, sem precisar de cartão de crédito",
+          "Depois do trial, cobrança mensal recorrente (o valor exato aparece na tela Assinatura)",
+          "Acesso completo durante o trial: Agenda, Pacientes, Prontuários, Financeiro, Caixa e Relatórios",
+          "Sem fidelidade — os dados da clínica continuam guardados mesmo que a assinatura fique em atraso",
+        ]} />
+
+        <H3>Como assinar o plano?</H3>
+        <Passo n={1}>Clique em "Assinatura" no menu da esquerda (só aparece para o Dono/Admin da clínica).</Passo>
+        <Passo n={2}>Confira se o campo "CPF ou CNPJ" está preenchido em Configurações → Dados da Clínica. Sem isso, o sistema não deixa criar a assinatura.</Passo>
+        <Passo n={3}>Clique em <strong>"Quero assinar agora"</strong>.</Passo>
+        <Passo n={4}>Uma fatura é gerada pelo Asaas (nosso parceiro de cobrança) e abre automaticamente em uma nova aba para pagamento.</Passo>
+
+        <Atencao>
+          Só o Dono ou Administrador da clínica vê o botão para assinar. Recepcionistas e profissionais veem a tela de Assinatura, mas com a mensagem "Fale com o administrador da clínica para assinar o plano."
+        </Atencao>
+
+        <H3>O que acontece quando o teste grátis termina?</H3>
+        <P>
+          Se os 7 dias de teste terminarem e a clínica ainda não tiver assinado, o acesso ao sistema fica bloqueado — ao tentar abrir qualquer tela (Agenda, Pacientes, etc.), você é redirecionado automaticamente para a tela de Assinatura. Os dados da clínica não são apagados: assim que a assinatura for feita, o acesso volta ao normal imediatamente.
+        </P>
+
+        <H3>O que significa cada status na tela de Assinatura?</H3>
+        <Lista itens={[
+          "Trial — período de teste em andamento, mostra quantos dias restam",
+          "Assinatura ativa — pagamento em dia, acesso liberado normalmente",
+          "Suspenso — assinatura em atraso ou cancelada; o acesso fica bloqueado até regularizar",
+        ]} />
+
+        <Dica>
+          Um dia antes do fim do trial, o sistema envia um e-mail automático avisando que o período de teste está acabando — fique de olho na caixa de entrada do e-mail cadastrado na clínica.
         </Dica>
       </>
     ),
@@ -672,6 +725,9 @@ const secoes: Secao[] = [
 
         <H3>Posso imprimir o manual?</H3>
         <P>Sim! Use o botão "Imprimir Manual PDF" no topo desta página para gerar uma versão completa do manual para impressão.</P>
+
+        <H3>Meu período de teste acabou e não consigo mais acessar o sistema. E agora?</H3>
+        <P>Isso é esperado: depois dos 7 dias de teste grátis, o acesso fica bloqueado até a clínica assinar o plano. Vá até a tela "Assinatura" no menu (ou você já será redirecionado para ela automaticamente) e clique em "Quero assinar agora". Veja o capítulo <strong>Assinatura — Trial e Cobrança</strong> para o passo a passo completo.</P>
 
         <Dica>
           Se tiver alguma dúvida não respondida aqui, entre em contato com o suporte do ClinicFlow.
