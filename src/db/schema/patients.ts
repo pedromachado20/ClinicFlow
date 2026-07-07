@@ -20,6 +20,10 @@ export const patients = pgTable("patients", {
   observacoes: text("observacoes"),
   fotoUrl: text("foto_url"),
   ativo: boolean("ativo").notNull().default(true),
+  // LGPD — anonimização (Art. 18 VI): dado de identificação é apagado, mas o prontuário
+  // clínico vinculado ao pacienteId permanece intacto para cumprir a guarda legal do CFM.
+  anonimizado: boolean("anonimizado").notNull().default(false),
+  anonimizadoEm: timestamp("anonimizado_em", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({

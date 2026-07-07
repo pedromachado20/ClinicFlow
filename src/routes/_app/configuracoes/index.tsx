@@ -24,7 +24,11 @@ const getConfig = createServerFn({ method: "GET" }).handler(async () => {
   requireRole(userRole, ADMIN_ROLES);
   const { eq } = await import("drizzle-orm");
   const { tenants } = await import("~/db/schema");
-  return db.query.tenants.findFirst({ where: eq(tenants.id, tenantId) });
+  const tenant = await db.query.tenants.findFirst({ where: eq(tenants.id, tenantId) });
+  if (!tenant) return tenant;
+  // Segredos nunca voltam em texto puro para o navegador — só uma flag indicando se já foram configurados.
+  const { evolutionApiKey, zapiClientToken, ...rest } = tenant;
+  return { ...rest, evolutionApiKeySet: !!evolutionApiKey, zapiClientTokenSet: !!zapiClientToken };
 });
 
 const salvarDados = createServerFn({ method: "POST" })
@@ -63,7 +67,15 @@ const salvarWhatsapp = createServerFn({ method: "POST" })
     requireRole(userRole, ADMIN_ROLES);
     const { eq } = await import("drizzle-orm");
     const { tenants } = await import("~/db/schema");
-    await db.update(tenants).set({ ...data, updatedAt: new Date() }).where(eq(tenants.id, tenantId));
+    const { encryptSecret } = await import("~/server/crypto");
+
+    // Campos em branco mantêm o segredo já salvo — o navegador nunca recebe o valor real para reenviar.
+    const { evolutionApiKey, zapiClientToken, ...rest } = data;
+    const update: Record<string, unknown> = { ...rest, updatedAt: new Date() };
+    if (evolutionApiKey) update.evolutionApiKey = encryptSecret(evolutionApiKey);
+    if (zapiClientToken) update.zapiClientToken = encryptSecret(zapiClientToken);
+
+    await db.update(tenants).set(update).where(eq(tenants.id, tenantId));
   });
 
 const testarConexao = createServerFn({ method: "POST" })
@@ -81,21 +93,25 @@ const testarConexao = createServerFn({ method: "POST" })
       throw new Error("WhatsApp não configurado");
     }
 
+    const { decryptSecret } = await import("~/server/crypto");
+    const evolutionApiKey = decryptSecret(tenant.evolutionApiKey);
+    const zapiClientToken = decryptSecret(tenant.zapiClientToken);
+
     const numero = data.telefone.replace(/\D/g, "");
     const payload = { phone: `55${numero}`, message: "Conexão com ClinicFlow testada com sucesso!" };
 
     if (tenant.whatsappProvider === "z-api") {
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
-        "Client-Token": tenant.zapiClientToken ?? "",
+        "Client-Token": zapiClientToken ?? "",
       };
-      const url = `${tenant.evolutionApiUrl}/instances/${tenant.evolutionInstance}/token/${tenant.evolutionApiKey}/send-text`;
+      const url = `${tenant.evolutionApiUrl}/instances/${tenant.evolutionInstance}/token/${evolutionApiKey}/send-text`;
       const res = await fetch(url, { method: "POST", headers, body: JSON.stringify(payload) });
       if (!res.ok) throw new Error(`Erro Z-API: ${res.status}`);
     } else if (tenant.whatsappProvider === "evolution") {
       const res = await fetch(`${tenant.evolutionApiUrl}/message/sendText/${tenant.evolutionInstance}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "apikey": tenant.evolutionApiKey ?? "" },
+        headers: { "Content-Type": "application/json", "apikey": evolutionApiKey ?? "" },
         body: JSON.stringify({ number: `55${numero}`, text: payload.message }),
       });
       if (!res.ok) throw new Error(`Erro Evolution: ${res.status}`);
@@ -284,10 +300,13 @@ function ConfiguracoesPage() {
     setProvider(data.whatsappProvider ?? "nenhum");
     setWhatsappAtivo(data.whatsappAtivo ?? false);
     setWppUrl(data.evolutionApiUrl ?? "");
-    setWppToken(data.evolutionApiKey ?? "");
     setWppInstance(data.evolutionInstance ?? "");
-    setWppClientToken(data.zapiClientToken ?? "");
+    // Token/Client Token nunca voltam do servidor — os campos ficam em branco;
+    // salvar em branco mantém o segredo já configurado (ver placeholder abaixo).
   }, [data]);
+
+  const tokenPlaceholder = data?.evolutionApiKeySet ? "•••••••• (configurado — deixe em branco para manter)" : "Token da instância";
+  const clientTokenPlaceholder = data?.zapiClientTokenSet ? "•••••••• (configurado — deixe em branco para manter)" : "Security Token";
 
   const salvarWppMut = useMutation({
     mutationFn: () => salvarWhatsapp({
@@ -457,7 +476,7 @@ function ConfiguracoesPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label>Token *</Label>
-                  <Input type="password" value={wppToken} onChange={(e) => setWppToken(e.target.value)} placeholder="Token da instância" />
+                  <Input type="password" value={wppToken} onChange={(e) => setWppToken(e.target.value)} placeholder={tokenPlaceholder} />
                 </div>
                 <div className="space-y-1.5">
                   <Label>ID da Instância *</Label>
@@ -469,7 +488,7 @@ function ConfiguracoesPage() {
                   Client Token{" "}
                   <span className="text-muted-foreground font-normal">(Segurança → Security Token no Z-API)</span>
                 </Label>
-                <Input type="password" value={wppClientToken} onChange={(e) => setWppClientToken(e.target.value)} placeholder="Security Token" />
+                <Input type="password" value={wppClientToken} onChange={(e) => setWppClientToken(e.target.value)} placeholder={clientTokenPlaceholder} />
               </div>
             </>
           )}
@@ -508,7 +527,7 @@ function ConfiguracoesPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label>API Key *</Label>
-                  <Input type="password" value={wppToken} onChange={(e) => setWppToken(e.target.value)} placeholder="API Key" />
+                  <Input type="password" value={wppToken} onChange={(e) => setWppToken(e.target.value)} placeholder={tokenPlaceholder} />
                 </div>
                 <div className="space-y-1.5">
                   <Label>Nome da Instância *</Label>

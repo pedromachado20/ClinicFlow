@@ -3,7 +3,7 @@ import { Link, useRouterState, useRouteContext } from "@tanstack/react-router";
 import {
   LayoutDashboard, CalendarDays, Users, UserCheck,
   Stethoscope, DollarSign, BarChart3, Settings, ChevronLeft,
-  ChevronRight, Receipt, ClipboardList, BookOpen, CreditCard,
+  ChevronRight, Receipt, ClipboardList, BookOpen, CreditCard, ShieldCheck,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "~/lib/utils";
@@ -47,6 +47,7 @@ const navItems: { label: string; items: NavItem[] }[] = [
       { icon: DollarSign, label: "Financeiro",    to: "/financeiro", roles: ADMIN_ROLES },
       { icon: BarChart3,  label: "Relatórios",    to: "/relatorios", roles: ADMIN_ROLES },
       { icon: Settings,   label: "Configurações", to: "/configuracoes", roles: ADMIN_ROLES },
+      { icon: ShieldCheck, label: "Auditoria",    to: "/auditoria", roles: ADMIN_ROLES },
       { icon: CreditCard, label: "Assinatura",    to: "/assinatura", roles: ADMIN_ROLES },
     ],
   },

@@ -1,8 +1,8 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouteContext } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/start";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useRef } from "react";
-import { Plus, Phone, Mail, Pencil, Trash2, Printer, Search, Camera, X, FileText } from "lucide-react";
+import { Plus, Phone, Mail, Pencil, Trash2, Printer, Search, Camera, X, FileText, Download, ShieldOff } from "lucide-react";
 import { z } from "zod";
 import { Card, CardContent } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~
 import { toast } from "sonner";
 import { formatPhone, calcularIdade } from "~/lib/utils";
 import { printTable } from "~/lib/pdf";
+import type { UserRole } from "~/server/context";
 
 const getPacientes = createServerFn({ method: "GET" }).handler(async () => {
   const { requireTenant } = await import("~/server/context");
@@ -70,6 +71,60 @@ const excluirPaciente = createServerFn({ method: "POST" })
     await db.update(patients).set({ ativo: false }).where(and(eq(patients.id, data.id), eq(patients.tenantId, tenantId)));
   });
 
+const exportarDadosPaciente = createServerFn({ method: "GET" })
+  .validator(z.object({ pacienteId: z.string() }))
+  .handler(async ({ data }) => {
+    const { requireTenant, requireRole, ADMIN_ROLES } = await import("~/server/context");
+    const { db } = await import("~/db");
+    const { tenantId, userId, userRole } = await requireTenant();
+    requireRole(userRole, ADMIN_ROLES);
+    const { eq, and } = await import("drizzle-orm");
+    const { patients, appointments, records, prescriptions, certificates, transacoes } = await import("~/db/schema");
+
+    const paciente = await db.query.patients.findFirst({ where: and(eq(patients.id, data.pacienteId), eq(patients.tenantId, tenantId)) });
+    if (!paciente) throw new Error("Paciente não encontrado");
+
+    const [agendamentos, prontuarios, receitas, atestados, financeiro] = await Promise.all([
+      db.query.appointments.findMany({
+        where: and(eq(appointments.tenantId, tenantId), eq(appointments.pacienteId, data.pacienteId)),
+        with: { professional: { columns: { nome: true } }, service: { columns: { nome: true } } },
+      }),
+      db.query.records.findMany({ where: and(eq(records.tenantId, tenantId), eq(records.pacienteId, data.pacienteId)) }),
+      db.query.prescriptions.findMany({ where: and(eq(prescriptions.tenantId, tenantId), eq(prescriptions.pacienteId, data.pacienteId)) }),
+      db.query.certificates.findMany({ where: and(eq(certificates.tenantId, tenantId), eq(certificates.pacienteId, data.pacienteId)) }),
+      db.query.transacoes.findMany({ where: and(eq(transacoes.tenantId, tenantId), eq(transacoes.pacienteId, data.pacienteId)) }),
+    ]);
+
+    const { registrarAuditoria } = await import("~/server/audit");
+    await registrarAuditoria({
+      tenantId, userId, acao: "exportar", entidade: "paciente", entidadeId: data.pacienteId, pacienteId: data.pacienteId,
+    });
+
+    return { paciente, agendamentos, prontuarios, receitas, atestados, financeiro, exportadoEm: new Date().toISOString() };
+  });
+
+const anonimizarPaciente = createServerFn({ method: "POST" })
+  .validator(z.object({ id: z.string() }))
+  .handler(async ({ data }) => {
+    const { requireTenant, requireRole, ADMIN_ROLES } = await import("~/server/context");
+    const { db } = await import("~/db");
+    const { tenantId, userId, userRole } = await requireTenant();
+    requireRole(userRole, ADMIN_ROLES);
+    const { patients } = await import("~/db/schema");
+    const { eq, and } = await import("drizzle-orm");
+
+    await db.update(patients).set({
+      nome: "Paciente Anonimizado",
+      cpf: null, rg: null, telefone: null, email: null,
+      observacoes: null, fotoUrl: null, numeroConvenio: null,
+      ativo: false, anonimizado: true, anonimizadoEm: new Date(),
+      updatedAt: new Date(),
+    }).where(and(eq(patients.id, data.id), eq(patients.tenantId, tenantId)));
+
+    const { registrarAuditoria } = await import("~/server/audit");
+    await registrarAuditoria({ tenantId, userId, acao: "anonimizar", entidade: "paciente", entidadeId: data.id, pacienteId: data.id });
+  });
+
 type Patient = Awaited<ReturnType<typeof getPacientes>>[number];
 
 export const Route = createFileRoute("/_app/pacientes/")({
@@ -119,9 +174,13 @@ function FotoUpload({ foto, onChange }: { foto: string; onChange: (v: string) =>
 
 function PacientesPage() {
   const qc = useQueryClient();
+  const { userRole } = useRouteContext({ from: "/_app" }) as { userRole?: UserRole };
+  const isAdmin = userRole === "owner" || userRole === "admin";
   const [open, setOpen] = useState(false);
   const [editando, setEditando] = useState<Patient | null>(null);
   const [excluindo, setExcluindo] = useState<string | null>(null);
+  const [anonimizando, setAnonimizando] = useState<Patient | null>(null);
+  const [confirmacaoAnonimizar, setConfirmacaoAnonimizar] = useState("");
   const [busca, setBusca] = useState("");
   const [sexoSel, setSexoSel] = useState("");
 
@@ -198,6 +257,32 @@ function PacientesPage() {
       setExcluindo(null);
     },
     onError: () => toast.error("Erro ao remover"),
+  });
+
+  const exportar = useMutation({
+    mutationFn: (pacienteId: string) => exportarDadosPaciente({ data: { pacienteId } }),
+    onSuccess: (dados) => {
+      const blob = new Blob([JSON.stringify(dados, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `dados-${dados.paciente.nome.replace(/\s+/g, "-").toLowerCase()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Dados exportados");
+    },
+    onError: () => toast.error("Erro ao exportar dados"),
+  });
+
+  const anonimizar = useMutation({
+    mutationFn: (id: string) => anonimizarPaciente({ data: { id } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["pacientes"] });
+      toast.success("Dados do paciente anonimizados");
+      setAnonimizando(null);
+      setConfirmacaoAnonimizar("");
+    },
+    onError: () => toast.error("Erro ao anonimizar"),
   });
 
   function handlePrint() {
@@ -309,6 +394,32 @@ function PacientesPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Dialog confirmação anonimização (LGPD) */}
+      <Dialog open={!!anonimizando} onOpenChange={(o) => { if (!o) { setAnonimizando(null); setConfirmacaoAnonimizar(""); } }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Anonimizar dados do paciente?</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Nome, CPF, RG, telefone, e-mail e foto de <strong>{anonimizando?.nome}</strong> serão apagados permanentemente.
+            O prontuário clínico é mantido (sem identificação) para cumprir a guarda legal de registros médicos. Essa ação não pode ser desfeita.
+          </p>
+          <div className="space-y-1.5">
+            <Label>Digite ANONIMIZAR para confirmar</Label>
+            <Input value={confirmacaoAnonimizar} onChange={(e) => setConfirmacaoAnonimizar(e.target.value)} placeholder="ANONIMIZAR" />
+          </div>
+          <div className="flex gap-2 mt-2">
+            <Button variant="outline" className="flex-1" onClick={() => { setAnonimizando(null); setConfirmacaoAnonimizar(""); }}>Cancelar</Button>
+            <Button
+              variant="destructive"
+              className="flex-1"
+              disabled={anonimizar.isPending || confirmacaoAnonimizar !== "ANONIMIZAR"}
+              onClick={() => anonimizar.mutate(anonimizando!.id)}
+            >
+              {anonimizar.isPending ? "Anonimizando..." : "Anonimizar"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {isLoading ? (
         <p className="text-sm text-muted-foreground">Carregando...</p>
       ) : !pacientesFiltrados.length ? (
@@ -361,6 +472,22 @@ function PacientesPage() {
                   <Button variant="ghost" size="sm" className="h-7 text-xs px-2" onClick={() => abrirEditar(p)}>
                     <Pencil className="h-3.5 w-3.5" />
                   </Button>
+                  {isAdmin && (
+                    <Button
+                      variant="ghost" size="sm" className="h-7 text-xs px-2" title="Exportar dados (LGPD)"
+                      disabled={exportar.isPending} onClick={() => exportar.mutate(p.id)}
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                  {isAdmin && !p.anonimizado && (
+                    <Button
+                      variant="ghost" size="sm" className="h-7 text-xs px-2 text-amber-600 hover:text-amber-600" title="Anonimizar dados (LGPD)"
+                      onClick={() => setAnonimizando(p)}
+                    >
+                      <ShieldOff className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
                   <Button variant="ghost" size="sm" className="h-7 text-xs px-2 text-destructive hover:text-destructive" onClick={() => setExcluindo(p.id)}>
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>

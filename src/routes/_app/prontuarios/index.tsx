@@ -17,17 +17,6 @@ import { toast } from "sonner";
 import { printProntuario, printReceita, printAtestado } from "~/lib/pdf";
 import { hojeLocal } from "~/lib/utils";
 
-async function assertPacienteEProfissional(tenantId: string, pacienteId: string, professionalId: string) {
-  const { db } = await import("~/db");
-  const { eq, and } = await import("drizzle-orm");
-  const { patients, professionals } = await import("~/db/schema");
-  const [paciente, profissional] = await Promise.all([
-    db.query.patients.findFirst({ where: and(eq(patients.id, pacienteId), eq(patients.tenantId, tenantId)), columns: { id: true } }),
-    db.query.professionals.findFirst({ where: and(eq(professionals.id, professionalId), eq(professionals.tenantId, tenantId)), columns: { id: true } }),
-  ]);
-  if (!paciente || !profissional) throw new Error("Paciente ou profissional inválido.");
-}
-
 const getProntuariosData = createServerFn({ method: "GET" }).handler(async () => {
   const { requireTenant } = await import("~/server/context");
   const { db } = await import("~/db");
@@ -49,7 +38,7 @@ const getPacienteRecords = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const { requireTenant } = await import("~/server/context");
     const { db } = await import("~/db");
-    const { tenantId } = await requireTenant();
+    const { tenantId, userId } = await requireTenant();
     const { eq, and } = await import("drizzle-orm");
     const { records, prescriptions, certificates } = await import("~/db/schema");
 
@@ -71,6 +60,11 @@ const getPacienteRecords = createServerFn({ method: "GET" })
       }),
     ]);
 
+    const { registrarAuditoria } = await import("~/server/audit");
+    await registrarAuditoria({
+      tenantId, userId, acao: "visualizar", entidade: "paciente", entidadeId: data.pacienteId, pacienteId: data.pacienteId,
+    });
+
     return { prontuarios, receitas, atestados };
   });
 
@@ -91,11 +85,15 @@ const salvarProntuario = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { requireTenant, requireRole, CLINICAL_ROLES } = await import("~/server/context");
     const { db } = await import("~/db");
-    const { tenantId, userRole } = await requireTenant();
+    const { tenantId, userId, userRole } = await requireTenant();
     requireRole(userRole, CLINICAL_ROLES);
     const { records } = await import("~/db/schema");
+    const { assertPacienteEProfissional } = await import("~/server/ownership");
     await assertPacienteEProfissional(tenantId, data.pacienteId, data.professionalId);
-    await db.insert(records).values({ id: crypto.randomUUID(), tenantId, ...data });
+    const id = crypto.randomUUID();
+    await db.insert(records).values({ id, tenantId, ...data });
+    const { registrarAuditoria } = await import("~/server/audit");
+    await registrarAuditoria({ tenantId, userId, acao: "criar", entidade: "prontuario", entidadeId: id, pacienteId: data.pacienteId });
   });
 
 const salvarReceita = createServerFn({ method: "POST" })
@@ -109,11 +107,15 @@ const salvarReceita = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { requireTenant, requireRole, CLINICAL_ROLES } = await import("~/server/context");
     const { db } = await import("~/db");
-    const { tenantId, userRole } = await requireTenant();
+    const { tenantId, userId, userRole } = await requireTenant();
     requireRole(userRole, CLINICAL_ROLES);
     const { prescriptions } = await import("~/db/schema");
+    const { assertPacienteEProfissional } = await import("~/server/ownership");
     await assertPacienteEProfissional(tenantId, data.pacienteId, data.professionalId);
-    await db.insert(prescriptions).values({ id: crypto.randomUUID(), tenantId, ...data });
+    const id = crypto.randomUUID();
+    await db.insert(prescriptions).values({ id, tenantId, ...data });
+    const { registrarAuditoria } = await import("~/server/audit");
+    await registrarAuditoria({ tenantId, userId, acao: "criar", entidade: "receita", entidadeId: id, pacienteId: data.pacienteId });
   });
 
 const salvarAtestado = createServerFn({ method: "POST" })
@@ -132,11 +134,15 @@ const salvarAtestado = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { requireTenant, requireRole, CLINICAL_ROLES } = await import("~/server/context");
     const { db } = await import("~/db");
-    const { tenantId, userRole } = await requireTenant();
+    const { tenantId, userId, userRole } = await requireTenant();
     requireRole(userRole, CLINICAL_ROLES);
     const { certificates } = await import("~/db/schema");
+    const { assertPacienteEProfissional } = await import("~/server/ownership");
     await assertPacienteEProfissional(tenantId, data.pacienteId, data.professionalId);
-    await db.insert(certificates).values({ id: crypto.randomUUID(), tenantId, ...data as any });
+    const id = crypto.randomUUID();
+    await db.insert(certificates).values({ id, tenantId, ...data as any });
+    const { registrarAuditoria } = await import("~/server/audit");
+    await registrarAuditoria({ tenantId, userId, acao: "criar", entidade: "atestado", entidadeId: id, pacienteId: data.pacienteId });
   });
 
 type Medicamento = { nome: string; dosagem: string; via: string; posologia: string; duracao: string; quantidade: string };

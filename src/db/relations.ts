@@ -9,6 +9,7 @@ import { records } from "./schema/records";
 import { prescriptions } from "./schema/prescriptions";
 import { certificates } from "./schema/certificates";
 import { transacoes } from "./schema/financial";
+import { auditLogs } from "./schema/audit";
 
 export const tenantsRelations = relations(tenants, ({ many }) => ({
   users: many(users),
@@ -80,4 +81,10 @@ export const certificatesRelations = relations(certificates, ({ one }) => ({
 
 export const transacoesRelations = relations(transacoes, ({ one }) => ({
   tenant: one(tenants, { fields: [transacoes.tenantId], references: [tenants.id] }),
+}));
+
+export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
+  tenant: one(tenants, { fields: [auditLogs.tenantId], references: [tenants.id] }),
+  user: one(users, { fields: [auditLogs.userId], references: [users.id] }),
+  paciente: one(patients, { fields: [auditLogs.pacienteId], references: [patients.id] }),
 }));

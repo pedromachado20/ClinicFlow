@@ -24,6 +24,7 @@ import { Route as AppPacientesIndexImport } from './routes/_app/pacientes/index'
 import { Route as AppFinanceiroIndexImport } from './routes/_app/financeiro/index'
 import { Route as AppConfiguracoesIndexImport } from './routes/_app/configuracoes/index'
 import { Route as AppCaixaIndexImport } from './routes/_app/caixa/index'
+import { Route as AppAuditoriaIndexImport } from './routes/_app/auditoria/index'
 import { Route as AppAssinaturaIndexImport } from './routes/_app/assinatura/index'
 import { Route as AppAjudaIndexImport } from './routes/_app/ajuda/index'
 import { Route as AppAgendaIndexImport } from './routes/_app/agenda/index'
@@ -107,6 +108,12 @@ const AppCaixaIndexRoute = AppCaixaIndexImport.update({
   getParentRoute: () => AppRoute,
 } as any)
 
+const AppAuditoriaIndexRoute = AppAuditoriaIndexImport.update({
+  id: '/auditoria/',
+  path: '/auditoria/',
+  getParentRoute: () => AppRoute,
+} as any)
+
 const AppAssinaturaIndexRoute = AppAssinaturaIndexImport.update({
   id: '/assinatura/',
   path: '/assinatura/',
@@ -185,6 +192,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAssinaturaIndexImport
       parentRoute: typeof AppImport
     }
+    '/_app/auditoria/': {
+      id: '/_app/auditoria/'
+      path: '/auditoria'
+      fullPath: '/auditoria'
+      preLoaderRoute: typeof AppAuditoriaIndexImport
+      parentRoute: typeof AppImport
+    }
     '/_app/caixa/': {
       id: '/_app/caixa/'
       path: '/caixa'
@@ -251,6 +265,7 @@ interface AppRouteChildren {
   AppAgendaIndexRoute: typeof AppAgendaIndexRoute
   AppAjudaIndexRoute: typeof AppAjudaIndexRoute
   AppAssinaturaIndexRoute: typeof AppAssinaturaIndexRoute
+  AppAuditoriaIndexRoute: typeof AppAuditoriaIndexRoute
   AppCaixaIndexRoute: typeof AppCaixaIndexRoute
   AppConfiguracoesIndexRoute: typeof AppConfiguracoesIndexRoute
   AppFinanceiroIndexRoute: typeof AppFinanceiroIndexRoute
@@ -266,6 +281,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppAgendaIndexRoute: AppAgendaIndexRoute,
   AppAjudaIndexRoute: AppAjudaIndexRoute,
   AppAssinaturaIndexRoute: AppAssinaturaIndexRoute,
+  AppAuditoriaIndexRoute: AppAuditoriaIndexRoute,
   AppCaixaIndexRoute: AppCaixaIndexRoute,
   AppConfiguracoesIndexRoute: AppConfiguracoesIndexRoute,
   AppFinanceiroIndexRoute: AppFinanceiroIndexRoute,
@@ -287,6 +303,7 @@ export interface FileRoutesByFullPath {
   '/agenda': typeof AppAgendaIndexRoute
   '/ajuda': typeof AppAjudaIndexRoute
   '/assinatura': typeof AppAssinaturaIndexRoute
+  '/auditoria': typeof AppAuditoriaIndexRoute
   '/caixa': typeof AppCaixaIndexRoute
   '/configuracoes': typeof AppConfiguracoesIndexRoute
   '/financeiro': typeof AppFinanceiroIndexRoute
@@ -306,6 +323,7 @@ export interface FileRoutesByTo {
   '/agenda': typeof AppAgendaIndexRoute
   '/ajuda': typeof AppAjudaIndexRoute
   '/assinatura': typeof AppAssinaturaIndexRoute
+  '/auditoria': typeof AppAuditoriaIndexRoute
   '/caixa': typeof AppCaixaIndexRoute
   '/configuracoes': typeof AppConfiguracoesIndexRoute
   '/financeiro': typeof AppFinanceiroIndexRoute
@@ -326,6 +344,7 @@ export interface FileRoutesById {
   '/_app/agenda/': typeof AppAgendaIndexRoute
   '/_app/ajuda/': typeof AppAjudaIndexRoute
   '/_app/assinatura/': typeof AppAssinaturaIndexRoute
+  '/_app/auditoria/': typeof AppAuditoriaIndexRoute
   '/_app/caixa/': typeof AppCaixaIndexRoute
   '/_app/configuracoes/': typeof AppConfiguracoesIndexRoute
   '/_app/financeiro/': typeof AppFinanceiroIndexRoute
@@ -347,6 +366,7 @@ export interface FileRouteTypes {
     | '/agenda'
     | '/ajuda'
     | '/assinatura'
+    | '/auditoria'
     | '/caixa'
     | '/configuracoes'
     | '/financeiro'
@@ -365,6 +385,7 @@ export interface FileRouteTypes {
     | '/agenda'
     | '/ajuda'
     | '/assinatura'
+    | '/auditoria'
     | '/caixa'
     | '/configuracoes'
     | '/financeiro'
@@ -383,6 +404,7 @@ export interface FileRouteTypes {
     | '/_app/agenda/'
     | '/_app/ajuda/'
     | '/_app/assinatura/'
+    | '/_app/auditoria/'
     | '/_app/caixa/'
     | '/_app/configuracoes/'
     | '/_app/financeiro/'
@@ -434,6 +456,7 @@ export const routeTree = rootRoute
         "/_app/agenda/",
         "/_app/ajuda/",
         "/_app/assinatura/",
+        "/_app/auditoria/",
         "/_app/caixa/",
         "/_app/configuracoes/",
         "/_app/financeiro/",
@@ -464,6 +487,10 @@ export const routeTree = rootRoute
     },
     "/_app/assinatura/": {
       "filePath": "_app/assinatura/index.tsx",
+      "parent": "/_app"
+    },
+    "/_app/auditoria/": {
+      "filePath": "_app/auditoria/index.tsx",
       "parent": "/_app"
     },
     "/_app/caixa/": {

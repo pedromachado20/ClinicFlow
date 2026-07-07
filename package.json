@@ -10,7 +10,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
-    "db:push": "drizzle-kit push"
+    "db:push": "drizzle-kit push",
+    "test": "vitest run"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.0.1",
@@ -43,8 +44,8 @@
     "@tanstack/router-plugin": "1.120.20",
     "@tanstack/server-functions-plugin": "1.120.17",
     "@tanstack/start": "^1.120.20",
-    "@tanstack/start-server-core": "1.120.19",
     "@tanstack/start-client-core": "1.120.19",
+    "@tanstack/start-server-core": "1.120.19",
     "better-auth": "1.2.8",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -80,6 +81,7 @@
     "tailwindcss": "^4.1.6",
     "typescript": "^5.8.3",
     "vite": "^6.3.5",
-    "vite-tsconfig-paths": "^6.1.1"
+    "vite-tsconfig-paths": "^6.1.1",
+    "vitest": "4.1.10"
   }
 }

@@ -15,13 +15,17 @@ export async function enviarWhatsapp(tenantId: string, numero: string | null | u
   const tel = numero.replace(/\D/g, "");
   if (tel.length < 10) return;
 
+  const { decryptSecret } = await import("~/server/crypto");
+  const evolutionApiKey = decryptSecret(tenant.evolutionApiKey);
+  const zapiClientToken = decryptSecret(tenant.zapiClientToken);
+
   try {
     if (tenant.whatsappProvider === "z-api") {
       await fetch(
-        `${tenant.evolutionApiUrl}/instances/${tenant.evolutionInstance}/token/${tenant.evolutionApiKey}/send-text`,
+        `${tenant.evolutionApiUrl}/instances/${tenant.evolutionInstance}/token/${evolutionApiKey}/send-text`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json", "Client-Token": tenant.zapiClientToken ?? "" },
+          headers: { "Content-Type": "application/json", "Client-Token": zapiClientToken ?? "" },
           body: JSON.stringify({ phone: `55${tel}`, message: mensagem }),
         }
       );
@@ -30,7 +34,7 @@ export async function enviarWhatsapp(tenantId: string, numero: string | null | u
         `${tenant.evolutionApiUrl}/message/sendText/${tenant.evolutionInstance}`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json", apikey: tenant.evolutionApiKey ?? "" },
+          headers: { "Content-Type": "application/json", apikey: evolutionApiKey ?? "" },
           body: JSON.stringify({ number: `55${tel}`, text: mensagem }),
         }
       );
