@@ -18,7 +18,6 @@ const criarClinica = createServerFn({ method: "POST" })
     telefone: z.string().optional(),
     cidade: z.string().optional(),
     estado: z.string().optional(),
-    cnpj: z.string().optional(),
     cnes: z.string().optional(),
     nomeProfissional: z.string().min(2),
     especialidade: z.string(),
@@ -48,19 +47,9 @@ const criarClinica = createServerFn({ method: "POST" })
       telefone: data.telefone,
       cidade: data.cidade,
       estado: data.estado,
-      cnpj: data.cnpj,
       cnes: data.cnes,
       trialEndsAt,
     });
-
-    try {
-      const { criarCliente } = await import("~/server/asaas");
-      const { eq } = await import("drizzle-orm");
-      const cliente = await criarCliente({ nome: data.nomeClinica, email: data.email, telefone: data.telefone, cpfCnpj: data.cnpj });
-      await db.update(tenants).set({ asaasCustomerId: cliente.id }).where(eq(tenants.id, tenantId));
-    } catch (err) {
-      console.error("Falha ao criar cliente Asaas:", err);
-    }
 
     const signUpResult = await auth.api.signUpEmail({
       body: {
@@ -128,7 +117,6 @@ function OnboardingPage() {
     telefone: "",
     cidade: "",
     estado: "",
-    cnpj: "",
     cnes: "",
     nomeProfissional: "",
     registro: "",
@@ -156,7 +144,6 @@ function OnboardingPage() {
           telefone: form.telefone || undefined,
           cidade: form.cidade || undefined,
           estado: form.estado || undefined,
-          cnpj: form.cnpj || undefined,
           cnes: form.cnes || undefined,
           nomeProfissional: form.nomeProfissional,
           especialidade: espSel || "medico",
@@ -261,16 +248,9 @@ function OnboardingPage() {
                 <Input placeholder="SP" maxLength={2} value={form.estado} onChange={(e) => updateForm("estado", e.target.value)} />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>CPF ou CNPJ</Label>
-                <Input placeholder="000.000.000-00 ou 00.000.000/0000-00" value={form.cnpj} onChange={(e) => updateForm("cnpj", e.target.value)} />
-                <p className="text-xs text-muted-foreground">Necessário para assinar o plano depois do trial. Pode preencher depois em Configurações.</p>
-              </div>
-              <div className="space-y-1.5">
-                <Label>CNES</Label>
-                <Input placeholder="Cód. Nacional de Saúde" value={form.cnes} onChange={(e) => updateForm("cnes", e.target.value)} />
-              </div>
+            <div className="space-y-1.5">
+              <Label>CNES</Label>
+              <Input placeholder="Cód. Nacional de Saúde" value={form.cnes} onChange={(e) => updateForm("cnes", e.target.value)} />
             </div>
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => setStep(0)}><ArrowLeft className="h-4 w-4" /></Button>
