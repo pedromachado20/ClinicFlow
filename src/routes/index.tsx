@@ -326,6 +326,17 @@ function LandingPage() {
           <p>© {new Date().getFullYear()} ClinicFlow. Todos os direitos reservados.</p>
           <Link to="/login" className="hover:text-foreground transition-colors">Entrar</Link>
         </div>
+        <div className="border-t border-border px-4 py-6 text-center sm:px-6">
+          <p className="mb-2 text-xs text-muted-foreground">um produto</p>
+          <a
+            href="https://nexusteck.com.br"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex rounded-xl bg-neutral-950 px-6 py-3 shadow-md transition-opacity hover:opacity-90"
+          >
+            <img src="/logo-nexusteck.png" alt="NexusTeck" className="h-14 w-auto" />
+          </a>
+        </div>
       </footer>
     </div>
   );
